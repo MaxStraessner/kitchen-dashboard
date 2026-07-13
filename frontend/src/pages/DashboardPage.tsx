@@ -8,6 +8,7 @@ import { ShoppingPreviewCard } from '../features/shopping-preview/ShoppingPrevie
 import { TodoPreviewCard } from '../features/todo-preview/TodoPreviewCard'
 import { WeatherCard } from '../features/weather/WeatherCard'
 import { useDashboard } from '../hooks/useDashboard'
+import { SettingsMenu } from '../components/SettingsMenu'
 
 export function DashboardPage() {
   const { data, loading, offline } = useDashboard()
@@ -15,6 +16,7 @@ export function DashboardPage() {
     <main className={`dashboard ${loading ? 'is-loading' : ''}`}>
       <div className="ambient ambient--one" />
       <div className="ambient ambient--two" />
+      <SettingsMenu />
       <div className="top-grid" data-testid="top-grid">
         <ClockCard />
         <WeatherCard weather={data.weather} />
