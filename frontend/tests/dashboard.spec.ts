@@ -1,6 +1,31 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { createFallbackDashboard } from '../src/services/fallback'
+
+async function mockAuthentication(page: Page) {
+  await page.route('**/api/v1/setup/status', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"setupRequired":false}',
+    }),
+  )
+  await page.route('**/api/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'u1',
+        username: 'max',
+        displayName: 'Max',
+        role: 'admin',
+        household: { id: 'h1', name: 'Familie' },
+        mustChangePassword: false,
+        lastLoginAt: null,
+      }),
+    }),
+  )
+}
 
 function expectNoOverlap(
   first: { x: number; y: number; width: number; height: number },
@@ -15,6 +40,7 @@ function expectNoOverlap(
 }
 
 test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async ({ page }) => {
+  await mockAuthentication(page)
   await page.setViewportSize({ width: 1440, height: 2560 })
   const dashboard = createFallbackDashboard(new Date('2026-07-13T12:00:00+02:00'))
   dashboard.weather.data = {
@@ -68,8 +94,9 @@ test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async 
 })
 
 test('backend outage does not produce an empty page', async ({ page }) => {
+  await mockAuthentication(page)
   await page.setViewportSize({ width: 1440, height: 2560 })
-  await page.route('**/api/**', (route) => route.abort())
+  await page.route('**/api/v1/dashboard', (route) => route.abort())
   await page.goto('/')
   await expect(page.getByText(/Offline · zuletzt bekannte Ansicht/)).toBeVisible()
   await expect(page.getByText('Projektbesprechung')).toBeVisible()
