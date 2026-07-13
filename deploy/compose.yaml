@@ -1,0 +1,74 @@
+name: kitchen-dashboard-local
+services:
+  kitchen-dashboard-web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${APP_HTTP_PORT:-8080}:5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://kitchen-dashboard-api:8000
+    volumes:
+      - ../frontend:/app
+      - kitchen-dashboard-node-modules:/app/node_modules
+    depends_on:
+      kitchen-dashboard-api:
+        condition: service_healthy
+    networks: [kitchen-dashboard-app]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:5173/"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+
+  kitchen-dashboard-api:
+    build:
+      context: ../backend
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://kitchen_dashboard:change-me@kitchen-dashboard-postgres:5432/kitchen_dashboard}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Berlin}
+      WEATHER_LOCATION_NAME: ${WEATHER_LOCATION_NAME:-Unna}
+      WEATHER_LATITUDE: ${WEATHER_LATITUDE:-51.537}
+      WEATHER_LONGITUDE: ${WEATHER_LONGITUDE:-7.689}
+      CALENDAR_SOURCES_JSON: ${CALENDAR_SOURCES_JSON:-[]}
+    volumes:
+      - ../backend:/app
+    depends_on:
+      kitchen-dashboard-postgres:
+        condition: service_healthy
+    networks: [kitchen-dashboard-app, kitchen-dashboard-data]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2)"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+
+  kitchen-dashboard-postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kitchen_dashboard}
+      POSTGRES_USER: ${POSTGRES_USER:-kitchen_dashboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - kitchen-dashboard-postgres-data:/var/lib/postgresql/data
+    networks: [kitchen-dashboard-data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 4s
+      retries: 8
+
+networks:
+  kitchen-dashboard-app:
+  kitchen-dashboard-data:
+    internal: true
+
+volumes:
+  kitchen-dashboard-node-modules:
+  kitchen-dashboard-postgres-data:
