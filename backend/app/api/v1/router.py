@@ -2,6 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.account import router as account_router
+from app.api.v1.admin_users import router as admin_users_router
+from app.api.v1.auth import router as auth_router
+from app.api.v1.setup import router as setup_router
+from app.auth.dependencies import AuthContext, active_member
 from app.core.config import Settings, get_settings
 from app.core.time import utc_now
 from app.database.session import get_session
@@ -14,6 +19,10 @@ from app.services.calendar import CalendarService
 from app.services.weather import WeatherService
 
 router = APIRouter()
+router.include_router(setup_router)
+router.include_router(auth_router)
+router.include_router(account_router)
+router.include_router(admin_users_router)
 
 
 def weather_service(settings: Settings = Depends(get_settings)) -> WeatherService:
@@ -46,6 +55,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> HealthResponse
 
 @router.get("/weather", response_model=WeatherResponse)
 async def weather(
+    _: AuthContext = Depends(active_member),
     session: AsyncSession = Depends(get_session),
     service: WeatherService = Depends(weather_service),
 ) -> WeatherResponse:
@@ -54,6 +64,7 @@ async def weather(
 
 @router.get("/calendar/events", response_model=CalendarEventsResponse)
 async def calendar_events(
+    _: AuthContext = Depends(active_member),
     session: AsyncSession = Depends(get_session),
     service: CalendarService = Depends(calendar_service),
 ) -> CalendarEventsResponse:
@@ -62,6 +73,7 @@ async def calendar_events(
 
 @router.get("/calendar/sources", response_model=CalendarSourcesResponse)
 async def calendar_sources(
+    _: AuthContext = Depends(active_member),
     session: AsyncSession = Depends(get_session),
     service: CalendarService = Depends(calendar_service),
 ) -> CalendarSourcesResponse:
@@ -70,6 +82,7 @@ async def calendar_sources(
 
 @router.get("/dashboard", response_model=DashboardResponse)
 async def dashboard(
+    _: AuthContext = Depends(active_member),
     session: AsyncSession = Depends(get_session),
     weather_provider: WeatherService = Depends(weather_service),
     calendar_provider: CalendarService = Depends(calendar_service),
