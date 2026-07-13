@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +39,18 @@ class Settings(BaseSettings):
     calendar_cache_ttl_seconds: int = Field(default=900, ge=300, le=3600)
     calendar_sources_json: str = "[]"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    auth_cookie_secure: bool = False
+    auth_session_ttl_hours: int = Field(default=24, ge=1, le=168)
+    auth_remember_ttl_days: int = Field(default=30, ge=1, le=90)
+    auth_login_max_attempts: int = Field(default=5, ge=1, le=50)
+    auth_login_window_minutes: int = Field(default=15, ge=1, le=1440)
+    auth_allowed_origins: str = "http://localhost:8080,http://localhost:5173"
+
+    @model_validator(mode="after")
+    def validate_auth_cookie(self) -> Settings:
+        if self.app_env == "production" and not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE must be true in production")
+        return self
 
     @field_validator("calendar_sources_json")
     @classmethod
@@ -60,6 +72,18 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def auth_origins(self) -> list[str]:
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.auth_allowed_origins.split(",")
+            if origin.strip()
+        ]
+
+    @property
+    def auth_cookie_name(self) -> str:
+        return "__Host-kitchen_session" if self.app_env == "production" else "kitchen_session"
 
 
 @lru_cache
