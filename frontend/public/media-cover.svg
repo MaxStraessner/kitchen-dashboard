@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" role="img" aria-label="Abstraktes lokales Albumcover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#17372d"/><stop offset="1" stop-color="#0a1110"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="35%" cy="30%" r="70%">
+      <stop stop-color="#e6bb73" stop-opacity=".9"/><stop offset="1" stop-color="#67c99a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="480" height="480" rx="56" fill="url(#bg)"/>
+  <circle cx="160" cy="145" r="150" fill="url(#sun)"/>
+  <path d="M0 345c98-74 166-86 250-20 68 53 136 59 230 1v154H0z" fill="#88d5aa" opacity=".18"/>
+  <path d="M0 382c95-42 178-34 252 22 69 52 148 35 228-8v84H0z" fill="#d1ad72" opacity=".26"/>
+  <circle cx="357" cy="112" r="7" fill="#e8d8b6" opacity=".85"/>
+</svg>
+
