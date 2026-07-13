@@ -27,6 +27,10 @@ const emptyForm = {
 export function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<AdminUser | null>(null)
+  const [editForm, setEditForm] = useState({ displayName: '', username: '' })
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
+  const [resetForm, setResetForm] = useState({ password: '', passwordConfirmation: '' })
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -74,14 +78,20 @@ export function UsersPage() {
       setError(reason instanceof ApiError ? reason.message : 'Änderung fehlgeschlagen.')
     }
   }
-  async function reset(user: AdminUser) {
-    const temporary = window.prompt(
-      `Neues vorläufiges Passwort für ${user.displayName} (mindestens 12 Zeichen):`,
-    )
-    if (!temporary) return
+  async function reset(event: FormEvent) {
+    event.preventDefault()
+    if (!resetTarget) return
+    if (resetForm.password !== resetForm.passwordConfirmation)
+      return setError('Die Passwörter stimmen nicht überein.')
     try {
-      await authApi.resetPassword(user.id, temporary, temporary)
+      await authApi.resetPassword(
+        resetTarget.id,
+        resetForm.password,
+        resetForm.passwordConfirmation,
+      )
       setMessage('Vorläufiges Passwort wurde gesetzt.')
+      setResetTarget(null)
+      setResetForm({ password: '', passwordConfirmation: '' })
       await load()
     } catch (reason) {
       setError(
@@ -89,12 +99,11 @@ export function UsersPage() {
       )
     }
   }
-  async function edit(user: AdminUser) {
-    const displayName = window.prompt('Anzeigename:', user.displayName)
-    if (displayName === null) return
-    const username = window.prompt('Benutzername:', user.username)
-    if (username === null) return
-    await update(user, { displayName, username })
+  async function saveEdit(event: FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+    await update(editing, editForm)
+    setEditing(null)
   }
 
   return (
@@ -151,7 +160,13 @@ export function UsersPage() {
               </small>
             </div>
             <div className="user-actions">
-              <button className="quiet-button" onClick={() => void edit(user)}>
+              <button
+                className="quiet-button"
+                onClick={() => {
+                  setEditing(user)
+                  setEditForm({ displayName: user.displayName, username: user.username })
+                }}
+              >
                 <Pencil />
                 Benutzer bearbeiten
               </button>
@@ -164,7 +179,7 @@ export function UsersPage() {
                 <ShieldCheck />
                 {user.role === 'admin' ? 'Zum Mitglied' : 'Zum Administrator'}
               </button>
-              <button className="quiet-button" onClick={() => void reset(user)}>
+              <button className="quiet-button" onClick={() => setResetTarget(user)}>
                 <KeyRound />
                 Passwort zurücksetzen
               </button>
@@ -262,6 +277,94 @@ export function UsersPage() {
               Der Benutzer muss das vorläufige Passwort bei der ersten Anmeldung ändern.
             </p>
             <button className="primary-button">Benutzer speichern</button>
+          </form>
+        </div>
+      )}
+      {editing && (
+        <div className="sheet-backdrop">
+          <form className="user-dialog" onSubmit={(event) => void saveEdit(event)}>
+            <header>
+              <div>
+                <p className="auth-eyebrow">Konto bearbeiten</p>
+                <h2>{editing.displayName}</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Bearbeiten schließen"
+                onClick={() => setEditing(null)}
+              >
+                <X />
+              </button>
+            </header>
+            <label>
+              Anzeigename
+              <input
+                required
+                maxLength={80}
+                value={editForm.displayName}
+                onChange={(event) => setEditForm({ ...editForm, displayName: event.target.value })}
+              />
+            </label>
+            <label>
+              Benutzername
+              <input
+                required
+                minLength={3}
+                maxLength={32}
+                pattern="[A-Za-z0-9._-]+"
+                value={editForm.username}
+                onChange={(event) => setEditForm({ ...editForm, username: event.target.value })}
+              />
+            </label>
+            <button className="primary-button">Änderungen speichern</button>
+          </form>
+        </div>
+      )}
+      {resetTarget && (
+        <div className="sheet-backdrop">
+          <form className="user-dialog" onSubmit={(event) => void reset(event)}>
+            <header>
+              <div>
+                <p className="auth-eyebrow">Passwort zurücksetzen</p>
+                <h2>{resetTarget.displayName}</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Zurücksetzen schließen"
+                onClick={() => setResetTarget(null)}
+              >
+                <X />
+              </button>
+            </header>
+            <label>
+              Vorläufiges Passwort
+              <input
+                required
+                minLength={12}
+                maxLength={128}
+                type="password"
+                value={resetForm.password}
+                onChange={(event) => setResetForm({ ...resetForm, password: event.target.value })}
+              />
+            </label>
+            <label>
+              Passwort bestätigen
+              <input
+                required
+                minLength={12}
+                maxLength={128}
+                type="password"
+                value={resetForm.passwordConfirmation}
+                onChange={(event) =>
+                  setResetForm({ ...resetForm, passwordConfirmation: event.target.value })
+                }
+              />
+            </label>
+            <p className="auth-hint">
+              Alle bestehenden Sitzungen werden widerrufen. Das Passwort muss bei der nächsten
+              Anmeldung geändert werden.
+            </p>
+            <button className="primary-button">Vorläufiges Passwort setzen</button>
           </form>
         </div>
       )}
