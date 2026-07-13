@@ -6,7 +6,7 @@ This foundation is a modular monorepo without premature service distribution. Re
 
 ## Frontend
 
-`src/app` configures routes, `pages` composes the kiosk screen, `features` owns domain UI, `services` is the single network boundary, `hooks` manages clock and refresh lifecycles, `types` mirrors stable API contracts, and `styles` contains tokens plus layout rules. Feature placeholders include a code comment marking their replacement boundary.
+`src/app` configures routes, `auth` owns the single authentication provider, API client, and route guards, `pages` composes the kiosk and account screens, `features` owns domain UI, `services` is the network boundary, `hooks` manages clock and refresh lifecycles, `types` mirrors stable API contracts, and `styles` contains tokens plus layout rules.
 
 The dashboard has four grid rows. At 1440 × 2560, the document is viewport-bound and overflow is disabled; the calendar row is more than twice the top-row allocation. At smaller viewports, media and supporting cards reflow and document scrolling becomes available.
 
@@ -21,12 +21,17 @@ On initial load, local fallback content preserves the composition. A successful 
 - `providers/calendar`: private ICS transport, recurrence expansion, normalization
 - `database`: SQLAlchemy session and cache models
 - `core`: validated environment settings and time helpers
+- `auth`: Argon2id, opaque session tokens, CSRF, and request dependencies
+- `services/authentication_service`: setup, login, session rotation, and audit orchestration
+- `api/v1`: separate setup, authentication, account, and administration routers
 
 Providers never serialize their configuration. Services return normalized schemas only. One ICS fetch failure updates only that source to stale and leaves other results available.
 
 ## Data model
 
-`weather_cache` stores a single last-known-good normalized response and expiry. `calendar_source_status` stores public display metadata, priority, timestamps, stale state, and a sanitized error category. `calendar_events` stores only the bounded normalized event window. There are intentionally no user, household, role, task, or shopping tables.
+`weather_cache` stores a single last-known-good normalized response and expiry. `calendar_source_status` stores public display metadata, priority, timestamps, stale state, and a sanitized error category. `calendar_events` stores only the bounded normalized event window.
+
+Authentication adds `users`, `households`, `household_memberships`, `auth_sessions`, `login_attempts`, and `audit_events`. Roles belong to memberships. Session and CSRF bearer values are never persisted; only hashes are stored. Task and shopping tables remain intentionally absent.
 
 Alembic owns the schema. The application container runs `alembic upgrade head` before starting the API, gated on PostgreSQL health.
 
@@ -56,9 +61,8 @@ Event IDs are deterministic hashes of source, UID, recurrence identity, and occu
 
 ## Failure and security model
 
-Raw provider exceptions are not sent to clients or stored. Cache status uses generic messages. Source URLs live only in validated backend settings and are absent from schemas, frontend code, health responses, and example configuration. CORS is restricted to local development origins. PostgreSQL belongs only to an internal Docker network.
+Raw provider exceptions are not sent to clients or stored. Cache status uses generic messages. Source URLs live only in validated backend settings and are absent from schemas, frontend code, health responses, and example configuration. CORS and state-changing request origins are restricted to configured origins. Dashboard/provider APIs require an active household membership, while health remains public. PostgreSQL belongs only to an internal Docker network. Production requires secure cookies and HTTPS.
 
 ## Extension path
 
 New domains should add a feature in React and schema/service/provider or repository modules in FastAPI. Authentication and household scoping can later wrap API dependencies without changing provider boundaries. A realtime transport can later publish normalized domain events without making WebSockets a cache dependency.
-

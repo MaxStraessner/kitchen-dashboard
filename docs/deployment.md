@@ -15,5 +15,10 @@ A later deployment to the existing Hostinger VPS should:
 9. Keep the previous image tags and database backup for rollback. Roll back application images first; only downgrade migrations after confirming backward-compatibility.
 10. Monitor container health and logs without ever printing ICS URLs or environment values.
 
-Isolation is mandatory: do not reuse another application’s database, volume, Compose project, or container names, and do not restart unrelated services. Automated server updates remain out of scope.
+## Authentication requirements
 
+Production login and the one-time setup must only be exposed through HTTPS. Do not enter any password or perform setup over an unencrypted test port such as `18080`. Set `APP_ENV=production`, `AUTH_COOKIE_SECURE=true`, and `AUTH_ALLOWED_ORIGINS` to the exact HTTPS application origin. The API refuses insecure production cookie settings and uses a `__Host-` session cookie without a Domain attribute.
+
+Immediately after the application is reachable behind the protected HTTPS route, complete the one-time setup and create the first administrator. There are no default credentials. Treat an unexpectedly open setup screen on a database believed to contain users as a deployment fault and stop before entering credentials.
+
+Isolation is mandatory: do not reuse another application’s database, volume, Compose project, or container names, and do not restart unrelated services. Automated server updates remain out of scope.

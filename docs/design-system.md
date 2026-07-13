@@ -27,6 +27,10 @@ Cards share material, border, radius, and shadow primitives. Eyebrows provide sm
 
 Lucide icons use consistent fine strokes and only reinforce key concepts. The media cover is an original local SVG with no external rights or network dependency.
 
+Authentication and settings extend the same materials rather than introducing an admin template. Setup and login use a focused central card. Settings use calm large navigation cards and a translucent side sheet. Account and user management preserve the established borders, radii, shadows, typography, focus rings, and touch targets. Forms remain single-column at phone width; user actions reflow from a quiet card list instead of a dense table.
+
+The dashboard settings trigger is fixed in the upper-right visual margin. It does not participate in the dashboard grid, so the three top cards and the 1440 × 2560 kiosk allocation remain unchanged.
+
 ## Motion
 
 Only functional transitions and a subtle loading-border breath are used. `prefers-reduced-motion` collapses animation durations. There are no spring effects, large scaling, flashing, or permanently moving backgrounds.
@@ -38,4 +42,3 @@ At viewports at least 900 px wide and 1800 px tall, the root is fixed to exactly
 At shorter desktop/tablet sizes the dashboard uses natural height and scrolling; top/media and info cards reflow to two columns. At phone widths all main regions stack. The primary kiosk remains the optimization target.
 
 Agenda type, fixed date/time columns, and high-value titles are sized for reading from roughly two to four meters. Secondary metadata is visibly quieter but not essential to understanding the next event.
-
