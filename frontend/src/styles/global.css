@@ -1083,17 +1083,16 @@ button:not(:disabled):active {
   font-weight: var(--weight-semibold);
   box-shadow: 0 7px 24px rgba(98, 214, 139, 0.22);
 }
-.month-days .has-event::after {
-  content: '';
+.month-event-dots {
   position: absolute;
   bottom: 7%;
+  display: flex;
+  gap: 2px;
+}
+.month-event-dots i {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--color-blue);
-}
-.month-days .is-today::after {
-  background: #163d24;
 }
 .calendar-legend {
   display: flex;
@@ -1120,6 +1119,18 @@ button:not(:disabled):active {
   border-radius: 5px;
   color: var(--color-amber);
   background: rgba(255, 182, 92, 0.08);
+}
+.calendar-status {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.calendar-status small {
+  color: var(--color-amber);
+  font-size: inherit;
 }
 .demo-note {
   display: flex;

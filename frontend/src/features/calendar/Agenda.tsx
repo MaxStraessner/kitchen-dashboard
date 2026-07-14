@@ -1,11 +1,42 @@
 import { MapPin } from 'lucide-react'
 
 import type { CalendarEvent } from '../../types/api'
-import { dateKey, eventDate, isSameDay } from './dateUtils'
+import { dashboardTimeZone, dateKey, eventDate, isSameDay } from './dateUtils'
 
-const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'short' })
-const month = new Intl.DateTimeFormat('de-DE', { month: 'short' })
-const time = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' })
+const weekday = new Intl.DateTimeFormat('de-DE', {
+  weekday: 'short',
+  timeZone: dashboardTimeZone,
+})
+const month = new Intl.DateTimeFormat('de-DE', {
+  month: 'short',
+  timeZone: dashboardTimeZone,
+})
+const day = new Intl.DateTimeFormat('de-DE', { day: 'numeric', timeZone: dashboardTimeZone })
+const time = new Intl.DateTimeFormat('de-DE', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: dashboardTimeZone,
+})
+
+const sourcePriority: Record<string, number> = {
+  family: 10,
+  hannah: 20,
+  gabriel: 30,
+  school_holidays: 40,
+}
+
+function compareEvents(left: CalendarEvent, right: CalendarEvent): number {
+  const dayOrder = dateKey(eventDate(left)).localeCompare(dateKey(eventDate(right)))
+  if (dayOrder !== 0) return dayOrder
+  if (left.allDay !== right.allDay) return left.allDay ? -1 : 1
+  if (!left.allDay && !right.allDay) {
+    const chronological = new Date(left.start).getTime() - new Date(right.start).getTime()
+    if (chronological !== 0) return chronological
+  }
+  const priority =
+    (sourcePriority[left.calendarId] ?? 100) - (sourcePriority[right.calendarId] ?? 100)
+  return priority !== 0 ? priority : left.title.localeCompare(right.title, 'de')
+}
 
 interface Group {
   date: Date
@@ -13,7 +44,8 @@ interface Group {
 }
 
 export function Agenda({ events }: { events: CalendarEvent[] }) {
-  const visible = events.filter((event) => !event.cancelled).slice(0, 11)
+  const sorted = events.filter((event) => !event.cancelled).sort(compareEvents)
+  const visible = sorted.slice(0, 11)
   const groups = visible.reduce<Group[]>((result, event) => {
     const date = eventDate(event)
     const existing = result.find((group) => dateKey(group.date) === dateKey(date))
@@ -21,7 +53,7 @@ export function Agenda({ events }: { events: CalendarEvent[] }) {
     else result.push({ date, events: [event] })
     return result
   }, [])
-  const hidden = Math.max(0, events.length - visible.length)
+  const hidden = Math.max(0, sorted.length - visible.length)
 
   if (groups.length === 0)
     return <div className="agenda-empty">In den nächsten fünf Wochen stehen keine Termine an.</div>
@@ -31,7 +63,7 @@ export function Agenda({ events }: { events: CalendarEvent[] }) {
         <section className="agenda-day" key={dateKey(group.date)}>
           <div className="agenda-date">
             <span>{weekday.format(group.date).replace('.', '')}</span>
-            <strong>{group.date.getDate()}</strong>
+            <strong>{day.format(group.date)}</strong>
             <small>{month.format(group.date).replace('.', '')}</small>
             {isSameDay(group.date, new Date()) && <em>Heute</em>}
           </div>

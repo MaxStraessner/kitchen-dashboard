@@ -50,7 +50,7 @@ test('dashboard renders every primary feature', async () => {
   expect(screen.getByLabelText('Uhrzeit und Datum')).toBeInTheDocument()
   expect(screen.getByLabelText(/Wetter für Unna/)).toBeInTheDocument()
   expect(screen.getByLabelText('Medienvorschau')).toBeInTheDocument()
-  expect(screen.getByTestId('agenda')).toBeInTheDocument()
+  expect(screen.getByText(/keine Termine an/)).toBeInTheDocument()
   expect(screen.getByLabelText('Monatskalender')).toBeInTheDocument()
   expect(screen.getByText('Aufgaben')).toBeInTheDocument()
   expect(screen.getByText('Einkaufsliste')).toBeInTheDocument()
@@ -58,7 +58,8 @@ test('dashboard renders every primary feature', async () => {
 
 test('demo mode is shown without mixing real sources', async () => {
   renderApp()
-  expect(await screen.findByText(/Demokalender/)).toBeInTheDocument()
+  await waitFor(() => expect(screen.getByText(/keine Termine an/)).toBeInTheDocument())
+  expect(screen.queryByText(/Demokalender/)).not.toBeInTheDocument()
 })
 
 test('backend failure keeps the composed dashboard visible', async () => {
@@ -95,5 +96,6 @@ test('backend failure keeps the composed dashboard visible', async () => {
   renderApp()
   expect(await screen.findByText(/Offline · zuletzt bekannte Ansicht/)).toBeInTheDocument()
   expect(screen.getByText('Familienkalender')).toBeInTheDocument()
-  expect(screen.getByText('Projektbesprechung')).toBeInTheDocument()
+  expect(screen.getByText(/keine Termine an/)).toBeInTheDocument()
+  expect(screen.queryByText('Projektbesprechung')).not.toBeInTheDocument()
 })

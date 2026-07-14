@@ -28,7 +28,7 @@ export function useDashboard(): DashboardState {
       }
     }
     void load()
-    const timer = window.setInterval(() => void load(), 5 * 60_000)
+    const timer = window.setInterval(() => void load(), 60_000)
     return () => {
       controller.abort()
       window.clearInterval(timer)

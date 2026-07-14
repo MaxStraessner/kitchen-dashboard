@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import CalendarSourceConfig, Settings
@@ -18,6 +19,9 @@ from app.schemas.calendar import (
 )
 from app.schemas.common import ProviderMeta
 from app.services.demo import demo_calendar
+
+_calendar_refresh_lock = asyncio.Lock()
+_calendar_advisory_lock_id = 6_261_341_325
 
 
 def _event_to_model(event: CalendarEventSchema, refreshed_at: datetime) -> CalendarEvent:
@@ -53,8 +57,14 @@ def _event_to_model(event: CalendarEventSchema, refreshed_at: datetime) -> Calen
 
 
 def _model_to_event(model: CalendarEvent) -> CalendarEventSchema:
-    start: datetime | date = model.start_date if model.all_day else model.start_at  # type: ignore[assignment]
-    end: datetime | date = model.end_date if model.all_day else model.end_at  # type: ignore[assignment]
+    if model.all_day:
+        assert model.start_date is not None and model.end_date is not None
+        start: datetime | date = model.start_date
+        end: datetime | date = model.end_date
+    else:
+        assert model.start_at is not None and model.end_at is not None
+        start = ensure_utc(model.start_at)
+        end = ensure_utc(model.end_at)
     return CalendarEventSchema(
         id=model.external_id,
         calendar_id=model.source_id,
@@ -89,10 +99,11 @@ class CalendarService:
                 meta=ProviderMeta(updated_at=now, demo_mode=True),
             )
 
-        statuses = await self._status_map(session)
         fresh_after = now - timedelta(seconds=self.settings.calendar_cache_ttl_seconds)
 
-        def source_is_fresh(source: CalendarSourceConfig) -> bool:
+        def source_is_fresh(
+            source: CalendarSourceConfig, statuses: dict[str, CalendarSourceStatus]
+        ) -> bool:
             status = statuses.get(source.id)
             return (
                 status is not None
@@ -100,21 +111,35 @@ class CalendarService:
                 and ensure_utc(status.last_attempt_at) > fresh_after
             )
 
-        if statuses and all(source_is_fresh(source) for source in sources):
+        statuses = await self._status_map(session)
+        if statuses and all(source_is_fresh(source, statuses) for source in sources):
             return await self._cached_response(session, statuses, now)
 
-        window_start = now - timedelta(hours=3)
-        window_end = now + timedelta(weeks=5, days=1)
-        results = await asyncio.gather(
-            *[
-                self.provider.fetch(source, window_start, window_end, self.settings.app_timezone)
-                for source in sources
-            ],
-            return_exceptions=True,
-        )
-        for source, result in zip(sources, results, strict=True):
-            await self._store_result(session, source, result, now)
-        await session.commit()
+        async with _calendar_refresh_lock:
+            if session.get_bind().dialect.name == "postgresql":
+                await session.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                    {"lock_id": _calendar_advisory_lock_id},
+                )
+
+            statuses = await self._status_map(session)
+            due_sources = [source for source in sources if not source_is_fresh(source, statuses)]
+            if due_sources:
+                window_start = now - timedelta(hours=3)
+                window_end = now + timedelta(weeks=5, days=1)
+                results = await asyncio.gather(
+                    *[
+                        self.provider.fetch(
+                            source, window_start, window_end, self.settings.app_timezone
+                        )
+                        for source in due_sources
+                    ],
+                    return_exceptions=True,
+                )
+                for source, result in zip(due_sources, results, strict=True):
+                    await self._store_result(session, source, result, now)
+            await session.commit()
+
         return await self._cached_response(session, await self._status_map(session), now)
 
     async def get_sources(self, session: AsyncSession) -> CalendarSourcesResponse:
@@ -199,12 +224,36 @@ class CalendarService:
             for status in sorted(statuses.values(), key=lambda item: item.priority)
             if status.source_id in configured
         ]
+        events = [_model_to_event(model) for model in models]
+        priorities = {source.id: source.priority for source in self.settings.calendar_sources}
+        berlin = ZoneInfo(self.settings.app_timezone)
+
+        def sort_key(event: CalendarEventSchema) -> tuple[date, bool, datetime, int, str]:
+            if event.all_day:
+                assert isinstance(event.start, date) and not isinstance(event.start, datetime)
+                local_date = event.start
+                local_start = datetime.combine(local_date, datetime.min.time(), tzinfo=berlin)
+            else:
+                assert isinstance(event.start, datetime)
+                local_start = event.start.astimezone(berlin)
+                local_date = local_start.date()
+            return (
+                local_date,
+                not event.all_day,
+                local_start,
+                priorities.get(event.calendar_id, 1000),
+                event.title.casefold(),
+            )
+
+        events.sort(key=sort_key)
         updated_candidates = [
-            status.last_success_at for status in statuses.values() if status.last_success_at
+            status.last_success_at
+            for source_id, status in statuses.items()
+            if source_id in configured and status.last_success_at
         ]
         updated_at = max((ensure_utc(item) for item in updated_candidates), default=now)
         return CalendarEventsResponse(
-            events=[_model_to_event(model) for model in models],
+            events=events,
             sources=source_schemas,
             meta=ProviderMeta(
                 updated_at=updated_at,
