@@ -12,20 +12,54 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+let csrfToken: string | null = null
+
+type RequestOptions = Omit<RequestInit, 'body'> & { body?: unknown; csrf?: boolean }
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   let response: Response
   try {
+    const headers = new Headers(options.headers)
+    headers.set('Accept', 'application/json')
+    if (options.body !== undefined) headers.set('Content-Type', 'application/json')
+    if (options.csrf) {
+      if (!csrfToken) {
+        const csrfResponse = await request<{ csrfToken: string }>('/auth/csrf')
+        csrfToken = csrfResponse.csrfToken
+      }
+      headers.set('X-CSRF-Token', csrfToken)
+    }
     response = await fetch(`${API_ROOT}${path}`, {
-      headers: { Accept: 'application/json' },
-      signal,
+      ...options,
+      credentials: 'include',
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
     })
   } catch {
     throw new ApiError('Backend nicht erreichbar')
   }
-  if (!response.ok) throw new ApiError('Daten konnten nicht geladen werden', response.status)
+  if (!response.ok) {
+    if (response.status === 401) {
+      csrfToken = null
+      window.dispatchEvent(new Event('kitchen:unauthorized'))
+    }
+    let message = 'Daten konnten nicht geladen werden'
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (typeof payload.detail === 'string') message = payload.detail
+    } catch {
+      // Keep the safe fallback message.
+    }
+    throw new ApiError(message, response.status)
+  }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
+export function clearCsrfToken() {
+  csrfToken = null
+}
+
 export const dashboardApi = {
-  getDashboard: (signal?: AbortSignal) => request<DashboardResponse>('/dashboard', signal),
+  getDashboard: (signal?: AbortSignal) => request<DashboardResponse>('/dashboard', { signal }),
 }

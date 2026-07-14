@@ -18,3 +18,4 @@ frontend/test-results/
 Thumbs.db
 .idea/
 .vscode/
+.codex-deploy/
