@@ -1,11 +1,24 @@
 import { CalendarRange, Info } from 'lucide-react'
 
 import { Card } from '../../components/Card'
-import type { CalendarResponse } from '../../types/api'
+import type { CalendarResponse, WeatherResponse } from '../../types/api'
 import { Agenda } from './Agenda'
 import { MonthCalendar } from './MonthCalendar'
 
-export function CalendarPanel({ calendar }: { calendar: CalendarResponse }) {
+function updatedLabel(value: string): string {
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000))
+  if (elapsedMinutes < 1) return 'Zuletzt aktualisiert gerade eben'
+  if (elapsedMinutes === 1) return 'Zuletzt aktualisiert vor 1 Minute'
+  return `Zuletzt aktualisiert vor ${String(elapsedMinutes)} Minuten`
+}
+
+export function CalendarPanel({
+  calendar,
+  weather,
+}: {
+  calendar: CalendarResponse
+  weather: WeatherResponse
+}) {
   return (
     <Card className="calendar-card" aria-labelledby="calendar-title">
       <header className="calendar-header">
@@ -29,7 +42,7 @@ export function CalendarPanel({ calendar }: { calendar: CalendarResponse }) {
       </header>
       <div className="calendar-content">
         <div className="calendar-agenda">
-          <Agenda events={calendar.events} />
+          <Agenda events={calendar.events} forecast={weather.data.forecast} />
         </div>
         <aside className="calendar-side">
           <MonthCalendar events={calendar.events} />
@@ -38,10 +51,19 @@ export function CalendarPanel({ calendar }: { calendar: CalendarResponse }) {
               <span key={source.id}>
                 <i style={{ backgroundColor: source.color }} />
                 {source.name}
-                {source.stale && <small>alt</small>}
               </span>
             ))}
           </div>
+          {!calendar.meta.demo_mode && (
+            <div className="calendar-status" role="status">
+              <span>{updatedLabel(calendar.meta.updated_at)}</span>
+              {calendar.sources
+                .filter((source) => source.stale)
+                .map((source) => (
+                  <small key={source.id}>Kalender {source.name} derzeit nicht aktuell</small>
+                ))}
+            </div>
+          )}
           {calendar.meta.demo_mode && (
             <div className="demo-note">
               <Info aria-hidden="true" /> Demokalender · ICS-Quellen noch nicht konfiguriert

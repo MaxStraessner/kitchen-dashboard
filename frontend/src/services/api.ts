@@ -1,4 +1,4 @@
-import type { DashboardResponse } from '../types/api'
+import type { DashboardResponse, Task, TaskListResponse } from '../types/api'
 
 const API_ROOT = '/api/v1'
 
@@ -62,4 +62,12 @@ export function clearCsrfToken() {
 
 export const dashboardApi = {
   getDashboard: (signal?: AbortSignal) => request<DashboardResponse>('/dashboard', { signal }),
+}
+
+export const tasksApi = {
+  list: (signal?: AbortSignal) => request<TaskListResponse>('/tasks', { signal }),
+  create: (title: string) => request<Task>('/tasks', { method: 'POST', body: { title }, csrf: true }),
+  setCompleted: (id: string, completed: boolean) =>
+    request<Task>(`/tasks/${id}`, { method: 'PATCH', body: { completed }, csrf: true }),
+  remove: (id: string) => request<undefined>(`/tasks/${id}`, { method: 'DELETE', csrf: true }),
 }

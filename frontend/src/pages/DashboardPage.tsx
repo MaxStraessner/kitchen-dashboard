@@ -22,7 +22,7 @@ export function DashboardPage() {
         <WeatherCard weather={data.weather} />
         <MediaPreviewCard />
       </div>
-      <CalendarPanel calendar={data.calendar} />
+      <CalendarPanel calendar={data.calendar} weather={data.weather} />
       <div className="lower-grid" data-testid="lower-grid">
         <TodoPreviewCard />
         <ShoppingPreviewCard />

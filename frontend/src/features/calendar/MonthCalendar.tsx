@@ -1,9 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import type { CalendarEvent } from '../../types/api'
-import { dateKey, eventDate, isSameDay } from './dateUtils'
+import { dashboardTimeZone, dateKey, eventDateKeys } from './dateUtils'
 
-const monthYear = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
+const monthYear = new Intl.DateTimeFormat('de-DE', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: dashboardTimeZone,
+})
 const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
 export function MonthCalendar({
@@ -13,16 +17,25 @@ export function MonthCalendar({
   events: CalendarEvent[]
   now?: Date
 }) {
-  const first = new Date(now.getFullYear(), now.getMonth(), 1)
-  const leading = (first.getDay() + 6) % 7
+  const [year, month] = dateKey(now).split('-').map(Number)
+  const first = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, 1, 12))
+  const leading = (first.getUTCDay() + 6) % 7
   const gridStart = new Date(first)
-  gridStart.setDate(first.getDate() - leading)
+  gridStart.setUTCDate(first.getUTCDate() - leading)
   const days = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(gridStart)
-    date.setDate(gridStart.getDate() + index)
+    date.setUTCDate(gridStart.getUTCDate() + index)
     return date
   })
-  const eventDays = new Set(events.map((event) => dateKey(eventDate(event))))
+  const eventDays = new Map<string, string[]>()
+  for (const event of events) {
+    for (const key of eventDateKeys(event)) {
+      const colors = eventDays.get(key) ?? []
+      if (!colors.includes(event.color)) colors.push(event.color)
+      eventDays.set(key, colors)
+    }
+  }
+  const todayKey = dateKey(now)
 
   return (
     <section className="month-calendar" aria-label="Monatskalender">
@@ -47,14 +60,24 @@ export function MonthCalendar({
           <span
             key={dateKey(date)}
             className={[
-              date.getMonth() !== now.getMonth() ? 'is-outside' : '',
-              isSameDay(date, now) ? 'is-today' : '',
+              date.getUTCMonth() !== first.getUTCMonth() ? 'is-outside' : '',
+              dateKey(date) === todayKey ? 'is-today' : '',
               eventDays.has(dateKey(date)) ? 'has-event' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            {date.getDate()}
+            {date.getUTCDate()}
+            {eventDays.has(dateKey(date)) && (
+              <span className="month-event-dots" aria-hidden="true">
+                {eventDays
+                  .get(dateKey(date))
+                  ?.slice(0, 4)
+                  .map((color) => (
+                    <i key={color} style={{ backgroundColor: color }} />
+                  ))}
+              </span>
+            )}
           </span>
         ))}
       </div>

@@ -16,6 +16,17 @@ export interface WeatherData {
   high: number
   low: number
   observed_at: string
+  forecast: WeatherForecastDay[]
+}
+
+export interface WeatherForecastDay {
+  date: string
+  condition: string
+  weather_code: number
+  icon: string
+  precipitation_probability: number
+  high: number
+  low: number
 }
 
 export interface WeatherResponse {
@@ -60,4 +71,18 @@ export interface DashboardResponse {
   weather: WeatherResponse
   calendar: CalendarResponse
   meta: ProviderMeta
+}
+
+export interface Task {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  sortOrder: number
+}
+
+export interface TaskListResponse {
+  tasks: Task[]
 }

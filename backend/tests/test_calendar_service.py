@@ -54,7 +54,15 @@ def configured_settings() -> Settings:
             "priority": 20,
         },
     ]
-    return Settings(database_url="sqlite+aiosqlite://", calendar_sources_json=json.dumps(sources))
+    return Settings(
+        database_url="sqlite+aiosqlite://",
+        calendar_cache_ttl_seconds=60,
+        calendar_sources_json=json.dumps(sources),
+    )
+
+
+def test_calendar_cache_supports_one_minute_refresh() -> None:
+    assert configured_settings().calendar_cache_ttl_seconds == 60
 
 
 async def test_no_sources_returns_explicit_demo_mode(session: AsyncSession) -> None:

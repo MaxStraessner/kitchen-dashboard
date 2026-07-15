@@ -1,4 +1,4 @@
-import { Gauge, LogOut, UserRound, UsersRound } from 'lucide-react'
+import { CheckSquare, Gauge, LogOut, UserRound, UsersRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthProvider'
@@ -29,6 +29,13 @@ export function SettingsPage() {
           <div>
             <h2>Mein Konto</h2>
             <p>Anzeigename, Passwort und Sitzungen verwalten</p>
+          </div>
+        </Link>
+        <Link className="settings-card" to="/settings/tasks">
+          <CheckSquare />
+          <div>
+            <h2>Aufgaben</h2>
+            <p>Gemeinsame Aufgaben verwalten</p>
           </div>
         </Link>
         {auth.user?.role === 'admin' && (

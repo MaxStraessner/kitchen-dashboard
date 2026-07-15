@@ -99,5 +99,6 @@ test('backend outage does not produce an empty page', async ({ page }) => {
   await page.route('**/api/v1/dashboard', (route) => route.abort())
   await page.goto('/')
   await expect(page.getByText(/Offline · zuletzt bekannte Ansicht/)).toBeVisible()
-  await expect(page.getByText('Projektbesprechung')).toBeVisible()
+  await expect(page.getByText('Keine Termine').first()).toBeVisible()
+  await expect(page.getByText('Projektbesprechung')).toHaveCount(0)
 })

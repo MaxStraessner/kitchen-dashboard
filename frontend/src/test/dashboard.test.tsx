@@ -5,9 +5,9 @@ import { App } from '../app/App'
 import { AuthProvider } from '../auth/AuthProvider'
 import { createFallbackDashboard } from '../services/fallback'
 
-function renderApp() {
+function renderApp(initialEntries?: string[]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <AuthProvider>
         <App />
       </AuthProvider>
@@ -36,7 +36,30 @@ beforeEach(() => {
               mustChangePassword: false,
               lastLoginAt: null,
             }
-          : createFallbackDashboard()
+          : url.endsWith('/tasks')
+            ? {
+                tasks: [
+                  {
+                    id: 'open',
+                    title: 'Küche putzen',
+                    completed: false,
+                    createdAt: '',
+                    updatedAt: '',
+                    completedAt: null,
+                    sortOrder: 0,
+                  },
+                  {
+                    id: 'done',
+                    title: 'Müll rausbringen',
+                    completed: true,
+                    createdAt: '',
+                    updatedAt: '',
+                    completedAt: '',
+                    sortOrder: 1,
+                  },
+                ],
+              }
+            : createFallbackDashboard()
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(payload) })
     }),
   )
@@ -50,15 +73,29 @@ test('dashboard renders every primary feature', async () => {
   expect(screen.getByLabelText('Uhrzeit und Datum')).toBeInTheDocument()
   expect(screen.getByLabelText(/Wetter für Unna/)).toBeInTheDocument()
   expect(screen.getByLabelText('Medienvorschau')).toBeInTheDocument()
-  expect(screen.getByTestId('agenda')).toBeInTheDocument()
+  expect(screen.getAllByText('Keine Termine')).toHaveLength(7)
   expect(screen.getByLabelText('Monatskalender')).toBeInTheDocument()
   expect(screen.getByText('Aufgaben')).toBeInTheDocument()
+  expect(await screen.findByText('Küche putzen')).toBeInTheDocument()
+  expect(screen.queryByText('Müll rausbringen')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Neue Aufgabe')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/Erledigen:/)).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/Löschen:/)).not.toBeInTheDocument()
   expect(screen.getByText('Einkaufsliste')).toBeInTheDocument()
 })
 
 test('demo mode is shown without mixing real sources', async () => {
   renderApp()
-  expect(await screen.findByText(/Demokalender/)).toBeInTheDocument()
+  await waitFor(() => expect(screen.getAllByText('Keine Termine')).toHaveLength(7))
+  expect(screen.queryByText(/Demokalender/)).not.toBeInTheDocument()
+})
+
+test('task management is available in protected settings', async () => {
+  renderApp(['/settings/tasks'])
+  expect(await screen.findByRole('heading', { name: 'Aufgaben' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Neue Aufgabe')).toBeInTheDocument()
+  expect(screen.getByText('Küche putzen')).toBeInTheDocument()
+  expect(screen.getByText('Erledigt (1)')).toBeInTheDocument()
 })
 
 test('backend failure keeps the composed dashboard visible', async () => {
@@ -89,11 +126,18 @@ test('backend failure keeps the composed dashboard visible', async () => {
             }),
         })
       if (url.endsWith('/dashboard')) return Promise.reject(new Error('offline'))
+      if (url.endsWith('/tasks'))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ tasks: [] }),
+        })
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(fallback) })
     }),
   )
   renderApp()
   expect(await screen.findByText(/Offline · zuletzt bekannte Ansicht/)).toBeInTheDocument()
   expect(screen.getByText('Familienkalender')).toBeInTheDocument()
-  expect(screen.getByText('Projektbesprechung')).toBeInTheDocument()
+  expect(screen.getAllByText('Keine Termine')).toHaveLength(7)
+  expect(screen.queryByText('Projektbesprechung')).not.toBeInTheDocument()
 })
