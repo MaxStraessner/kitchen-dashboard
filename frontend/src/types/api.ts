@@ -16,6 +16,17 @@ export interface WeatherData {
   high: number
   low: number
   observed_at: string
+  forecast: WeatherForecastDay[]
+}
+
+export interface WeatherForecastDay {
+  date: string
+  condition: string
+  weather_code: number
+  icon: string
+  precipitation_probability: number
+  high: number
+  low: number
 }
 
 export interface WeatherResponse {

@@ -47,15 +47,20 @@ def test_weather_code_mapping_uses_german_label_and_night_icon() -> None:
             "wind_speed_10m": 7.4,
         },
         "daily": {
-            "temperature_2m_max": [23.1],
-            "temperature_2m_min": [14.8],
-            "precipitation_probability_max": [35],
+            "time": ["2026-07-13", "2026-07-14"],
+            "weather_code": [2, 61],
+            "temperature_2m_max": [23.1, 19.4],
+            "temperature_2m_min": [14.8, 12.2],
+            "precipitation_probability_max": [35, 70],
         },
     }
     mapped = map_weather_payload(payload, "Unna", "Europe/Berlin")
     assert mapped.condition == "Teilweise bewölkt"
     assert mapped.icon == "cloud-moon"
     assert mapped.observed_at.utcoffset() is not None
+    assert len(mapped.forecast) == 2
+    assert mapped.forecast[1].date.isoformat() == "2026-07-14"
+    assert mapped.forecast[1].condition == "Leichter Regen"
 
 
 async def test_weather_cache_avoids_repeated_provider_call(session: AsyncSession) -> None:

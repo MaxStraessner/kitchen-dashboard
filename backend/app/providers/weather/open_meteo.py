@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from app.schemas.weather import WeatherData
+from app.schemas.weather import WeatherData, WeatherForecastDay
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -51,6 +51,25 @@ def map_weather_payload(payload: dict[str, Any], location: str, timezone: str) -
     observed_at = datetime.fromisoformat(str(current["time"]))
     if observed_at.tzinfo is None:
         observed_at = observed_at.replace(tzinfo=ZoneInfo(timezone))
+    forecast = []
+    for index, forecast_date in enumerate(daily["time"]):
+        forecast_code = int(daily["weather_code"][index])
+        forecast_condition, forecast_icon, _ = WEATHER_CODES.get(
+            forecast_code, ("Unbekannt", "cloud", "cloud")
+        )
+        forecast.append(
+            WeatherForecastDay(
+                date=forecast_date,
+                condition=forecast_condition,
+                weather_code=forecast_code,
+                icon=forecast_icon,
+                precipitation_probability=int(
+                    daily["precipitation_probability_max"][index]
+                ),
+                high=round(float(daily["temperature_2m_max"][index]), 1),
+                low=round(float(daily["temperature_2m_min"][index]), 1),
+            )
+        )
     return WeatherData(
         location=location,
         temperature=round(float(current["temperature_2m"]), 1),
@@ -63,6 +82,7 @@ def map_weather_payload(payload: dict[str, Any], location: str, timezone: str) -
         high=round(float(daily["temperature_2m_max"][0]), 1),
         low=round(float(daily["temperature_2m_min"][0]), 1),
         observed_at=observed_at,
+        forecast=forecast,
     )
 
 
@@ -77,9 +97,12 @@ class OpenMeteoProvider:
             "latitude": latitude,
             "longitude": longitude,
             "current": "temperature_2m,weather_code,is_day,wind_speed_10m",
-            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "daily": (
+                "weather_code,temperature_2m_max,temperature_2m_min,"
+                "precipitation_probability_max"
+            ),
             "timezone": timezone,
-            "forecast_days": 1,
+            "forecast_days": 7,
         }
         if self._client is not None:
             response = await self._client.get(OPEN_METEO_URL, params=params)

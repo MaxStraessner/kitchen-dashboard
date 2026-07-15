@@ -23,7 +23,7 @@ body {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 button,
 input,
@@ -592,7 +592,7 @@ button:not(:disabled):active {
   }
 }
 .ambient {
-  position: absolute;
+  position: fixed;
   border-radius: 999px;
   filter: blur(100px);
   pointer-events: none;
@@ -916,11 +916,28 @@ button:not(:disabled):active {
 }
 .agenda-list {
   height: 100%;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0 clamp(18px, 1.8vw, 30px);
+  padding-right: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.agenda-list::-webkit-scrollbar {
+  width: 6px;
+}
+.agenda-list::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
 }
 .agenda-day {
   display: grid;
-  grid-template-columns: clamp(76px, 6.5vw, 98px) 1fr;
+  grid-template-columns: clamp(70px, 5.4vw, 88px) minmax(0, 1fr);
+  align-self: start;
   border-bottom: 1px solid var(--color-border);
 }
 .agenda-date {
@@ -956,6 +973,45 @@ button:not(:disabled):active {
   font-style: normal;
   letter-spacing: 0.06em;
 }
+.agenda-weather {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 3px 6px;
+  margin-top: 13px;
+  color: var(--color-text-secondary);
+  text-transform: none;
+}
+.agenda-weather > svg {
+  width: 24px;
+  height: 24px;
+  color: #ffd083;
+  stroke-width: 1.55;
+}
+.agenda-weather > span {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agenda-weather > span i {
+  color: var(--color-text-tertiary);
+  font-style: normal;
+}
+.agenda-weather > small {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.agenda-weather > small svg {
+  width: 11px;
+  height: 11px;
+}
 .agenda-events {
   min-width: 0;
 }
@@ -986,33 +1042,35 @@ button:not(:disabled):active {
 }
 .agenda-copy h3 {
   margin: 0;
-  overflow: hidden;
   color: var(--color-text);
   font-size: var(--font-md);
   font-weight: var(--weight-medium);
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agenda-copy p {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
   margin: 7px 0 0;
-  overflow: hidden;
   color: var(--color-text-tertiary);
   font-size: var(--font-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .agenda-copy svg {
   width: 13px;
   height: 13px;
   margin-left: 3px;
 }
-.agenda-more {
-  margin: 15px 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-sm);
+.agenda-day-empty {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-xs);
 }
 .agenda-empty {
   display: grid;
@@ -1373,6 +1431,11 @@ button:not(:disabled):active {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+@media (max-width: 1180px) {
+  .agenda-list {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 720px) {
   .top-grid,
   .lower-grid,
@@ -1396,6 +1459,9 @@ button:not(:disabled):active {
     max-height: 720px;
     padding-right: 0;
     border-right: 0;
+  }
+  .agenda-list {
+    padding-right: 4px;
   }
   .calendar-side {
     padding-top: 24px;
