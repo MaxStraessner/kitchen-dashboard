@@ -1,7 +1,7 @@
 import { CalendarRange, Info } from 'lucide-react'
 
 import { Card } from '../../components/Card'
-import type { CalendarResponse } from '../../types/api'
+import type { CalendarResponse, WeatherResponse } from '../../types/api'
 import { Agenda } from './Agenda'
 import { MonthCalendar } from './MonthCalendar'
 
@@ -12,7 +12,13 @@ function updatedLabel(value: string): string {
   return `Zuletzt aktualisiert vor ${String(elapsedMinutes)} Minuten`
 }
 
-export function CalendarPanel({ calendar }: { calendar: CalendarResponse }) {
+export function CalendarPanel({
+  calendar,
+  weather,
+}: {
+  calendar: CalendarResponse
+  weather: WeatherResponse
+}) {
   return (
     <Card className="calendar-card" aria-labelledby="calendar-title">
       <header className="calendar-header">
@@ -36,7 +42,7 @@ export function CalendarPanel({ calendar }: { calendar: CalendarResponse }) {
       </header>
       <div className="calendar-content">
         <div className="calendar-agenda">
-          <Agenda events={calendar.events} />
+          <Agenda events={calendar.events} forecast={weather.data.forecast} />
         </div>
         <aside className="calendar-side">
           <MonthCalendar events={calendar.events} />
