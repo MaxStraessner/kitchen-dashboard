@@ -72,3 +72,17 @@ export interface DashboardResponse {
   calendar: CalendarResponse
   meta: ProviderMeta
 }
+
+export interface Task {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  sortOrder: number
+}
+
+export interface TaskListResponse {
+  tasks: Task[]
+}
