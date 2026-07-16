@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     weather_cache_ttl_seconds: int = Field(default=900, ge=600, le=1800)
     calendar_cache_ttl_seconds: int = Field(default=60, ge=30, le=3600)
     calendar_sources_json: str = "[]"
+    bring_enabled: bool = False
+    bring_email: str = ""
+    bring_password: str = ""
+    bring_list_uuid: str = ""
+    bring_request_timeout_seconds: float = Field(default=15, ge=3, le=60)
+    bring_active_sync_seconds: int = Field(default=90, ge=90, le=900)
+    bring_idle_sync_seconds: int = Field(default=600, ge=600, le=3600)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     auth_cookie_secure: bool = False
     auth_session_ttl_hours: int = Field(default=24, ge=1, le=168)

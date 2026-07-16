@@ -3,6 +3,16 @@ import { expect, test, type Page } from '@playwright/test'
 import { createFallbackDashboard } from '../src/services/fallback'
 
 async function mockAuthentication(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'EventSource', {
+      configurable: true,
+      value: class {
+        onerror = null
+        addEventListener() {}
+        close() {}
+      },
+    })
+  })
   await page.route('**/api/v1/setup/status', (route) =>
     route.fulfill({
       status: 200,
@@ -22,6 +32,21 @@ async function mockAuthentication(page: Page) {
         household: { id: 'h1', name: 'Familie' },
         mustChangePassword: false,
         lastLoginAt: null,
+      }),
+    }),
+  )
+  await page.route('**/api/v1/bring/items', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [],
+        configured: true,
+        available: true,
+        stale: false,
+        status: 'ok',
+        last_successful_sync_at: '2026-07-16T08:00:00Z',
+        revision: 1,
       }),
     }),
   )
@@ -101,4 +126,66 @@ test('backend outage does not produce an empty page', async ({ page }) => {
   await expect(page.getByText(/Offline · zuletzt bekannte Ansicht/)).toBeVisible()
   await expect(page.getByText('Keine Termine').first()).toBeVisible()
   await expect(page.getByText('Projektbesprechung')).toHaveCount(0)
+})
+
+test('shopping list remains usable on smartphone, tablet and long kiosk layouts', async ({
+  page,
+}) => {
+  await mockAuthentication(page)
+  const dashboard = createFallbackDashboard(new Date('2026-07-16T12:00:00+02:00'))
+  await page.route('**/api/v1/dashboard', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboard),
+    }),
+  )
+  const items = Array.from({ length: 60 }, (_, index) => ({
+    id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    name: `Sehr langer gut umbrechender Einkaufsartikel Nummer ${String(index + 1)}`,
+    specification: index % 2 === 0 ? '2 große Packungen' : '',
+    position: index,
+  }))
+  await page.unroute('**/api/v1/bring/items')
+  await page.route('**/api/v1/bring/items', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items,
+        configured: true,
+        available: true,
+        stale: false,
+        status: 'ok',
+        last_successful_sync_at: '2026-07-16T08:00:00Z',
+        revision: 2,
+      }),
+    }),
+  )
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await expect(page.getByText('60 offen')).toBeVisible()
+  expect(
+    await page
+      .locator('.shopping-grid')
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
+  ).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+  await page.getByRole('button', { name: 'Artikel hinzufügen' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Artikelname')).toBeFocused()
+  await page.getByRole('button', { name: 'Dialog schließen' }).click()
+
+  await page.setViewportSize({ width: 1024, height: 1366 })
+  expect(
+    await page
+      .locator('.shopping-grid')
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
+  ).toBe(2)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1024)
+
+  await page.setViewportSize({ width: 1440, height: 2560 })
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(2560)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440)
 })

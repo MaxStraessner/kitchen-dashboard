@@ -1362,8 +1362,98 @@ button:not(:disabled):active {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  padding: 4px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  color: var(--color-text);
+  background: transparent;
   font-size: var(--font-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition:
+    opacity var(--transition-slow),
+    color var(--transition-slow);
+}
+.shopping-item:disabled {
+  cursor: default;
+}
+.shopping-item.is-done {
+  opacity: 0.48;
+}
+.shopping-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.shopping-copy small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-xs);
+  line-height: 1.25;
+}
+.shopping-empty,
+.shopping-state {
+  grid-column: 1 / -1;
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.shopping-empty strong {
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
+}
+.shopping-state {
+  flex-direction: row;
+}
+.shopping-state svg {
+  width: 17px;
+}
+.shopping-skeleton {
+  min-height: 36px;
+  border-radius: 6px;
+  border-color: transparent;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.025) 20%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(255, 255, 255, 0.025) 70%
+  );
+  background-size: 220% 100%;
+  animation: shopping-shimmer 1.6s infinite linear;
+}
+@keyframes shopping-shimmer {
+  to {
+    background-position-x: -220%;
+  }
+}
+.shopping-notice {
+  margin: 10px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-xs);
+  line-height: 1.35;
+}
+.shopping-notice.is-error {
+  color: #ff9ba0;
+}
+.shopping-dialog-backdrop {
+  justify-content: center;
+  padding: 18px;
+}
+.shopping-dialog {
+  width: min(520px, 100%);
+}
+.shopping-dialog label small {
+  color: var(--color-text-tertiary);
+}
+.shopping-dialog .form-error {
+  margin-bottom: 0;
 }
 .quiet-add {
   align-self: flex-start;
@@ -1498,6 +1588,18 @@ button:not(:disabled):active {
   .dashboard {
     height: 100vh;
     min-height: 0;
+  }
+  html:has(.shopping-item:nth-child(17)),
+  body:has(.shopping-item:nth-child(17)),
+  #root:has(.shopping-item:nth-child(17)) {
+    height: auto;
+    overflow-y: auto;
+  }
+  .dashboard:has(.shopping-item:nth-child(17)) {
+    height: auto;
+    min-height: 100vh;
+    grid-template-rows: minmax(360px, auto) minmax(870px, auto) auto minmax(190px, auto);
+    overflow: visible;
   }
 }
 @media (max-width: 1050px), (max-height: 1500px) {

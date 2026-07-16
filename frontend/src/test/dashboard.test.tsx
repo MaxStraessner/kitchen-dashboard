@@ -94,7 +94,7 @@ test('task management is available in protected settings', async () => {
   renderApp(['/settings/tasks'])
   expect(await screen.findByRole('heading', { name: 'Aufgaben' })).toBeInTheDocument()
   expect(screen.getByLabelText('Neue Aufgabe')).toBeInTheDocument()
-  expect(screen.getByText('Küche putzen')).toBeInTheDocument()
+  expect(await screen.findByText('Küche putzen')).toBeInTheDocument()
   expect(screen.getByText('Erledigt (1)')).toBeInTheDocument()
 })
 
