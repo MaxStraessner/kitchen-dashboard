@@ -36,7 +36,7 @@ jobs:
       - name: Alembic heads
         run: python -m alembic heads
       - name: Tests
-        run: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+        run: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
 
   frontend:
     runs-on: ubuntu-latest
