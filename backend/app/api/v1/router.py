@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.account import router as account_router
 from app.api.v1.admin_users import router as admin_users_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.bring import router as bring_router
 from app.api.v1.setup import router as setup_router
 from app.api.v1.tasks import router as tasks_router
 from app.auth.dependencies import AuthContext, active_member
@@ -25,6 +26,7 @@ router.include_router(auth_router)
 router.include_router(account_router)
 router.include_router(admin_users_router)
 router.include_router(tasks_router)
+router.include_router(bring_router)
 
 
 def weather_service(settings: Settings = Depends(get_settings)) -> WeatherService:

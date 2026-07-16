@@ -15,13 +15,14 @@ Implemented now:
 - PostgreSQL-backed normalized event cache and independent source health
 - Five-week agenda, current-month calendar, and source-derived legend
 - Explicit, realistic demo calendar when no ICS sources exist
-- Static replaceable media, task, shopping, and information features
+- Static replaceable media, task, and information features
+- Bidirectional shared Bring shopping list with safe server-side credentials
 - React component tests, FastAPI tests, and Playwright kiosk checks
 - Development and production-oriented Docker Compose definitions
 
 Also implemented: one-time household setup, username/password accounts, administrator and member roles, Argon2id password hashing, server-side sessions, CSRF protection, personal account settings, and administrator user management.
 
-Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a mobile app, editable tasks or shopping, Bring, Spotify API, Microsoft Graph/Azure, WebSockets, devices, Home Assistant, cameras, N8N, reverse proxy, or domain configuration.
+Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a mobile app, editable tasks, Spotify API, WebSockets, devices, Home Assistant, cameras, N8N, reverse proxy, or domain configuration.
 
 ## Architecture
 
@@ -122,8 +123,31 @@ This deletion is only for an explicit empty-database test and destroys local Kit
 | `AUTH_LOGIN_MAX_ATTEMPTS` | Failed attempts in the window, default `5` |
 | `AUTH_LOGIN_WINDOW_MINUTES` | Login limiting window, default `15` |
 | `AUTH_ALLOWED_ORIGINS` | Exact trusted browser origins for state-changing requests |
+| `BRING_ENABLED` | Enables the server-side Bring adapter; disabled by default |
+| `BRING_EMAIL` | Bring account email; protected host secret, never commit it |
+| `BRING_PASSWORD` | Bring account password; protected host secret, never commit it |
+| `BRING_LIST_UUID` | UUID of the shared list; keep it in host configuration |
 
 The Unna coordinates identify the city center area and are configurable for a more precise household location.
+
+## Bring shopping list
+
+Bring is connected only by the FastAPI backend through the unofficial `bring-api` package. The browser never receives Bring credentials, tokens, list UUIDs, or raw provider responses. Dashboard accounts and the existing CSRF protection remain the only user-facing authentication.
+
+Before production activation, change any Bring password that was previously shared in a chat. Enter the replacement only in the protected VPS/Hostinger configuration together with `BRING_EMAIL` and `BRING_LIST_UUID`; never paste those values into chat, source files, tests, logs, screenshots, or pull requests. Set `BRING_ENABLED=true` only after all three values are present. Set it to `false` to disable the integration without affecting the rest of the dashboard.
+
+To identify the list UUID safely on the server, first set `BRING_ENABLED`, `BRING_EMAIL`, and `BRING_PASSWORD` in the protected environment, then run:
+
+```powershell
+cd backend
+python -m app.cli.bring_lists
+```
+
+The command prints only list names and UUIDs. It never prints credentials, tokens, headers, or full responses. If exactly one list exists, the adapter can temporarily select it automatically; multiple lists require `BRING_LIST_UUID`.
+
+Changes made in a dashboard are written to Bring and distributed to connected dashboards immediately over Server-Sent Events. While a visible dashboard is connected, external Bring changes are checked at most once per 90 seconds. With no visible client, polling pauses; a returning client refreshes if the last attempt is old enough. This is not a realtime guarantee because Bring provides no public webhook API. The last successful list is stored in PostgreSQL and is shown as stale during a temporary outage. Bring failures do not affect the general healthcheck or other dashboard features.
+
+For diagnosis, inspect only `/api/v1/bring/status` and sanitized application messages. A healthy configured connection reports `configured`, `available`, `stale`, and `last_successful_sync_at`. Never enable HTTP-client debug logging in production and never copy raw Bring exceptions into tickets.
 
 ## ICS configuration
 
@@ -174,6 +198,8 @@ Playwright writes the 1440 × 2560 screenshot to `frontend/tests/artifacts/dashb
 - `GET /api/v1/calendar/events`
 - `GET /api/v1/calendar/sources`
 - `GET /api/v1/dashboard`
+- `GET/POST /api/v1/bring/items`, `POST /api/v1/bring/items/{id}/complete`
+- `GET /api/v1/bring/status`, `GET /api/v1/bring/events`
 - `GET /api/v1/setup/status`, `POST /api/v1/setup/initialize`
 - `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`
 - `GET /api/v1/auth/me`, `GET /api/v1/auth/csrf`, `POST /api/v1/auth/change-password`
@@ -191,7 +217,8 @@ Responses expose update, stale, and demo metadata but never source URLs or raw i
 ## Known limitations
 
 - Week and month navigation are intentionally disabled visual preparations; agenda is the working view.
-- Static preview controls do not mutate data.
+- Task and media preview controls do not mutate data.
+- Bring is an unofficial interface and external app changes can take up to 90 seconds to appear.
 - A cold-start provider outage has no historical weather cache, so a quiet placeholder is returned.
 - The written visual specification was available during implementation, but no separate reference image file was attached for pixel-level comparison.
 - Deployment remains a documented future operation only.

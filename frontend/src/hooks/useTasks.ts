@@ -22,10 +22,18 @@ export function useTasks(): TasksState & {
     loading.current = true
     try {
       const response = await tasksApi.list(signal)
-      setState({ tasks: Array.isArray(response.tasks) ? response.tasks : [], loading: false, error: null })
+      setState({
+        tasks: Array.isArray(response.tasks) ? response.tasks : [],
+        loading: false,
+        error: null,
+      })
     } catch (error) {
       if (signal?.aborted) return
-      setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : 'Aufgaben konnten nicht geladen werden.' }))
+      setState((current) => ({
+        ...current,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Aufgaben konnten nicht geladen werden.',
+      }))
     } finally {
       loading.current = false
     }
@@ -33,7 +41,9 @@ export function useTasks(): TasksState & {
 
   useEffect(() => {
     const controller = new AbortController()
-    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
     void refresh(controller.signal)
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
@@ -46,16 +56,23 @@ export function useTasks(): TasksState & {
     }
   }, [refresh])
 
-  const mutate = useCallback(async (action: () => Promise<unknown>) => {
-    try {
-      await action()
-      await refresh()
-    } catch (error) {
-      setState((current) => ({ ...current, error: error instanceof Error ? error.message : 'Änderung konnte nicht gespeichert werden.' }))
-      await refresh()
-      throw error
-    }
-  }, [refresh])
+  const mutate = useCallback(
+    async (action: () => Promise<unknown>) => {
+      try {
+        await action()
+        await refresh()
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          error:
+            error instanceof Error ? error.message : 'Änderung konnte nicht gespeichert werden.',
+        }))
+        await refresh()
+        throw error
+      }
+    },
+    [refresh],
+  )
 
   return {
     ...state,
