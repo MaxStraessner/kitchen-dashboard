@@ -89,7 +89,7 @@ test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async 
   await page.goto('/')
   await expect(page.getByText('Familienkalender')).toBeVisible()
   await expect(page.getByText('Aufgaben')).toBeVisible()
-  await expect(page.getByText('Einkaufsliste')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Einkaufsliste' })).toBeVisible()
   await expect(page.getByText('WLAN Gastzugang')).toBeVisible()
   await expect(page.getByAltText('QR-Code für den WLAN-Gastzugang')).toBeVisible()
   await expect(page.getByLabel('Geburtstags-Countdown für Hannah')).toBeVisible()
