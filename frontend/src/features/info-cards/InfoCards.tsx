@@ -1,62 +1,44 @@
-import { CakeSlice, Droplets, Quote, ThermometerSun } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Quote } from 'lucide-react'
 
 import { Card } from '../../components/Card'
+import { useMinuteClock } from '../../hooks/useMinuteClock'
+import { berlinCalendarDate } from './birthday'
+import { BirthdayCard } from './BirthdayCard'
+import { GuestWifiCard } from './GuestWifiCard'
 
-interface InfoItem {
-  label: string
-  value: string
-  detail: string
-  icon: LucideIcon
-  accent: string
-}
-
-const items: InfoItem[] = [
+const birthdays = [
   {
-    label: 'Gedanke des Tages',
-    value: 'Zusammen ist unser Lieblingsort.',
-    detail: 'Familienmoment',
-    icon: Quote,
-    accent: 'violet',
+    name: 'Hannah',
+    birthDate: '2017-06-29',
+    accent: 'rose' as const,
   },
   {
-    label: 'Wasser',
-    value: '5 von 8 Gläsern',
-    detail: 'Noch 3 bis zum Tagesziel',
-    icon: Droplets,
-    accent: 'blue',
-  },
-  {
-    label: 'Nächster Geburtstag',
-    value: 'Hannah · in 14 Tagen',
-    detail: 'Geschenkidee notieren',
-    icon: CakeSlice,
-    accent: 'rose',
-  },
-  {
-    label: 'Raumtemperatur',
-    value: '21,4 °C',
-    detail: 'Küche · angenehm',
-    icon: ThermometerSun,
-    accent: 'amber',
+    name: 'Gabriel',
+    birthDate: '2026-02-26',
+    accent: 'blue' as const,
+    omitZeroYears: true,
   },
 ]
 
 export function InfoCards() {
+  const currentDate = berlinCalendarDate(useMinuteClock())
+
   return (
     <div className="info-grid">
-      {items.map(({ label, value, detail, icon: Icon, accent }) => (
-        <Card className={`info-card info-card--${accent}`} key={label}>
-          <div className="info-icon">
-            <Icon aria-hidden="true" />
-          </div>
-          <div>
-            <span>{label}</span>
-            <strong>{value}</strong>
-            <small>{detail}</small>
-          </div>
-        </Card>
+      {birthdays.map((birthday) => (
+        <BirthdayCard currentDate={currentDate} key={birthday.name} {...birthday} />
       ))}
+      <GuestWifiCard />
+      <Card className="info-card info-card--violet">
+        <div className="info-icon">
+          <Quote aria-hidden="true" />
+        </div>
+        <div>
+          <span>Spruch des Tages</span>
+          <strong>Zusammen ist unser Lieblingsort.</strong>
+          <small>Familienmoment</small>
+        </div>
+      </Card>
     </div>
   )
 }
