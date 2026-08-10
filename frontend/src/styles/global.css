@@ -1521,6 +1521,80 @@ button:not(:disabled):active {
   color: var(--color-text-secondary);
   font-size: var(--font-xs);
 }
+.birthday-card > div:last-child {
+  gap: 4px;
+}
+.birthday-countdown {
+  display: flex !important;
+  align-items: baseline;
+  gap: 8px;
+  overflow: visible !important;
+  font-variant-numeric: tabular-nums;
+  -webkit-line-clamp: unset !important;
+}
+.birthday-countdown b {
+  font-size: clamp(30px, 2.55vw, 44px);
+  font-weight: var(--weight-light);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.birthday-countdown span {
+  color: var(--color-text);
+  font-size: var(--font-md);
+}
+.birthday-context {
+  color: var(--color-text-tertiary) !important;
+}
+.birthday-age {
+  margin-top: 4px;
+  line-height: 1.35;
+}
+.birthday-today {
+  display: block !important;
+  overflow: visible !important;
+  font-size: clamp(18px, 1.35vw, 24px) !important;
+  -webkit-line-clamp: unset !important;
+}
+.guest-wifi-card {
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 0.55vw, 8px);
+  padding-block: clamp(14px, 1.1vw, 16px);
+  text-align: center;
+}
+.guest-wifi-card__title {
+  margin: 0;
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-size: var(--font-md);
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.guest-wifi-card__qr-space {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+}
+.guest-wifi-card__qr {
+  display: block;
+  width: clamp(141px, 12vw, 170px);
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: none;
+  opacity: 1;
+  box-shadow: none;
+}
+.guest-wifi-card small {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
 .info-card--blue .info-icon {
   color: var(--color-blue);
   background: rgba(95, 168, 255, 0.09);

@@ -89,8 +89,14 @@ test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async 
   await page.goto('/')
   await expect(page.getByText('Familienkalender')).toBeVisible()
   await expect(page.getByText('Aufgaben')).toBeVisible()
-  await expect(page.getByText('Einkaufsliste')).toBeVisible()
-  await expect(page.getByText('Raumtemperatur')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Einkaufsliste' })).toBeVisible()
+  await expect(page.getByText('WLAN Gastzugang')).toBeVisible()
+  await expect(page.getByAltText('QR-Code für den WLAN-Gastzugang')).toBeVisible()
+  await expect(page.getByLabel('Geburtstags-Countdown für Hannah')).toBeVisible()
+  await expect(page.getByLabel('Geburtstags-Countdown für Gabriel')).toBeVisible()
+  await expect(page.getByText('Zusammen ist unser Lieblingsort.')).toBeVisible()
+  await expect(page.getByText('Wasser')).toHaveCount(0)
+  await expect(page.getByText('Raumtemperatur')).toHaveCount(0)
 
   const dimensions = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -116,6 +122,86 @@ test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async 
   expect(calendar.height).toBeGreaterThan(top.height * 1.8)
 
   await page.screenshot({ path: 'tests/artifacts/dashboard-1440x2560.png', fullPage: true })
+})
+
+test('info cards and guest wifi QR remain responsive on smartphone, tablet and kiosk', async ({
+  page,
+}) => {
+  await mockAuthentication(page)
+  const dashboard = createFallbackDashboard(new Date('2026-08-10T12:00:00+02:00'))
+  await page.route('**/api/v1/dashboard', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboard),
+    }),
+  )
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await expect(page.getByLabel('Geburtstags-Countdown für Hannah')).toBeVisible()
+  await expect(page.getByLabel('Geburtstags-Countdown für Gabriel')).toBeVisible()
+  const qrCode = page.getByAltText('QR-Code für den WLAN-Gastzugang')
+  await expect(qrCode).toBeVisible()
+
+  const expectQrCodeIsContained = async () => {
+    const result = await qrCode.evaluate((node) => {
+      const image = node as HTMLImageElement
+      const qr = image.getBoundingClientRect()
+      const card = image.closest('.guest-wifi-card')?.getBoundingClientRect()
+      const style = getComputedStyle(image)
+      const contained = card
+        ? qr.left >= card.left &&
+          qr.right <= card.right &&
+          qr.top >= card.top &&
+          qr.bottom <= card.bottom
+        : false
+      return {
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        ratio: qr.width / qr.height,
+        contained,
+        filter: style.filter,
+        opacity: style.opacity,
+        objectFit: style.objectFit,
+      }
+    })
+    expect(result).toMatchObject({
+      naturalWidth: 141,
+      naturalHeight: 141,
+      contained: true,
+      filter: 'none',
+      opacity: '1',
+      objectFit: 'contain',
+    })
+    expect(result.ratio).toBeCloseTo(1, 2)
+  }
+
+  await expectQrCodeIsContained()
+  expect(
+    await page
+      .locator('.info-grid')
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
+  ).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+
+  await page.setViewportSize({ width: 1024, height: 1366 })
+  expect(
+    await page
+      .locator('.info-grid')
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
+  ).toBe(2)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1024)
+  await expectQrCodeIsContained()
+
+  await page.setViewportSize({ width: 1440, height: 2560 })
+  expect(
+    await page
+      .locator('.info-grid')
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
+  ).toBe(4)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440)
+  await expectQrCodeIsContained()
 })
 
 test('backend outage does not produce an empty page', async ({ page }) => {
