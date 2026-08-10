@@ -1,5 +1,9 @@
 # Production deployment
 
+The concise, executable production procedure is maintained in the repository-root
+[DEPLOYMENT.md](../DEPLOYMENT.md). This document provides the architectural and
+security background for that procedure.
+
 The Kitchen Dashboard runs as the isolated `kitchen-dashboard` Docker Compose project on the
 existing Hostinger VPS. Its checkout is `/docker/kitchen-dashboard`, its PostgreSQL volume and
 networks are dedicated to this project, and only the web container is published on host port
@@ -35,8 +39,10 @@ list UUID, set only the new credentials in the protected environment and run
 `docker compose -f deploy/compose.prod.yaml run --rm kitchen-dashboard-api python -m app.cli.bring_lists`.
 The command prints only list names and UUIDs.
 
-Before updating, verify the checkout and preserve any local deployment-only modification with a
-named Git stash. Back up PostgreSQL, pull only the merged default-branch commit, then run:
+Before updating, the deployment script verifies that tracked checkout files are clean and that the
+VPS `main` commit exactly equals `origin/main`. It refuses a divergent checkout rather than
+stashing or resetting it. It creates an additive PostgreSQL dump before a changed commit is
+deployed. The equivalent Compose operations are:
 
 ```text
 docker compose -f deploy/compose.prod.yaml build

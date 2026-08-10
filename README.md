@@ -88,6 +88,8 @@ docker compose -f deploy/compose.prod.yaml config
 
 Set strong non-example database credentials before starting it.
 
+For the established GitHub workflow, VPS deployment command, health checks, and non-destructive production safeguards, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ### First setup and accounts
 
 With an empty database, the application opens `/setup`. Enter the household name, display name, username, and a password of 12–128 characters. There is no setup code, default account, or default password. The first account becomes an administrator and is signed in automatically; setup is permanently closed after that transaction succeeds.
