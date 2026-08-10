@@ -36,6 +36,7 @@ cd "$1"
 printf '%s\n' "$(git branch --show-current)"
 git rev-parse HEAD
 '@
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $encodedRemoteScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
 
 $remoteOutput = & ssh -i $IdentityFile -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes $SshTarget "echo $encodedRemoteScript | base64 -d | bash -s -- '$ProjectDirectory'"
