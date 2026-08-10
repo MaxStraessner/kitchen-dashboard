@@ -72,7 +72,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   fail "tracked deployment files have local modifications; reconcile them intentionally before deploying"
 fi
 
-git fetch --prune origin "$main_branch"
+git fetch --prune origin "+refs/heads/$main_branch:refs/remotes/origin/$main_branch"
 git checkout --quiet "$main_branch"
 previous_commit="$(git rev-parse HEAD)"
 git pull --ff-only origin "$main_branch"
