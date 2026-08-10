@@ -132,6 +132,7 @@ printf '%s' "$api_health" | grep -q '"database":{"status":"healthy"}' || fail "d
 "${compose[@]}" ps
 printf 'VPS deployed: %s\n' "$deployed_commit"
 '@
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $encodedRemoteScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
 
 $sshArguments = @(
