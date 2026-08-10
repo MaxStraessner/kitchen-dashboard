@@ -1,4 +1,4 @@
-import { Gauge, LogOut, Settings, UserRound, UsersRound, X } from 'lucide-react'
+import { CheckSquare, Gauge, LogOut, Settings, UserRound, UsersRound, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -48,6 +48,10 @@ export function SettingsMenu() {
               <Link to="/account" onClick={() => setOpen(false)}>
                 <UserRound />
                 Mein Konto
+              </Link>
+              <Link to="/settings/tasks" onClick={() => setOpen(false)}>
+                <CheckSquare />
+                Aufgaben
               </Link>
               {auth.user?.role === 'admin' && (
                 <Link to="/settings/users" onClick={() => setOpen(false)}>

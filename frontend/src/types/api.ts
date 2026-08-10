@@ -72,3 +72,42 @@ export interface DashboardResponse {
   calendar: CalendarResponse
   meta: ProviderMeta
 }
+
+export interface Task {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  sortOrder: number
+}
+
+export interface TaskListResponse {
+  tasks: Task[]
+}
+
+export type BringState =
+  | 'ok'
+  | 'disabled'
+  | 'configuration_missing'
+  | 'authentication_failed'
+  | 'rate_limited'
+  | 'unavailable'
+
+export interface BringItem {
+  id: string
+  name: string
+  specification: string
+  position: number
+}
+
+export interface BringItemsResponse {
+  items: BringItem[]
+  configured: boolean
+  available: boolean
+  stale: boolean
+  status: BringState
+  last_successful_sync_at: string | null
+  revision: number
+}

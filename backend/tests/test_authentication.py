@@ -158,10 +158,32 @@ async def test_username_normalization_login_cookie_and_generic_errors(
 
 async def test_protected_endpoints_health_and_csrf(client: AsyncClient) -> None:
     assert (await client.get("/api/v1/health")).status_code == 200
-    for path in ("/dashboard", "/weather", "/calendar/events", "/calendar/sources"):
+    for path in (
+        "/dashboard",
+        "/weather",
+        "/calendar/events",
+        "/calendar/sources",
+        "/bring/items",
+        "/bring/status",
+        "/bring/events",
+    ):
         assert (await client.get(f"/api/v1{path}")).status_code == 401
     await setup(client)
     assert (await client.get("/api/v1/dashboard")).status_code == 200
+    bring_status = await client.get("/api/v1/bring/status")
+    assert bring_status.status_code == 200
+    assert bring_status.json() == {
+        "configured": False,
+        "available": False,
+        "stale": False,
+        "status": "disabled",
+        "last_successful_sync_at": None,
+    }
+    bring_items = await client.get("/api/v1/bring/items")
+    assert bring_items.status_code == 200
+    assert "email" not in bring_items.text.lower()
+    assert "password" not in bring_items.text.lower()
+    assert "token" not in bring_items.text.lower()
     assert (await client.patch("/api/v1/account", json={"displayName": "Neu"})).status_code == 403
     token = await csrf(client)
     invalid_origin = await client.patch(

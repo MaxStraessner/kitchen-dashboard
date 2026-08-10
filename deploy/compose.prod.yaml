@@ -39,6 +39,10 @@ services:
       WEATHER_LONGITUDE: ${WEATHER_LONGITUDE:-7.689}
       CALENDAR_CACHE_TTL_SECONDS: ${CALENDAR_CACHE_TTL_SECONDS:-60}
       CALENDAR_SOURCES_JSON: ${CALENDAR_SOURCES_JSON:-[]}
+      BRING_ENABLED: ${BRING_ENABLED:-false}
+      BRING_EMAIL: ${BRING_EMAIL:-}
+      BRING_PASSWORD: ${BRING_PASSWORD:-}
+      BRING_LIST_UUID: ${BRING_LIST_UUID:-}
     restart: unless-stopped
     depends_on:
       kitchen-dashboard-postgres:

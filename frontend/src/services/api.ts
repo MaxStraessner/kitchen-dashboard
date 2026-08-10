@@ -1,4 +1,10 @@
-import type { DashboardResponse } from '../types/api'
+import type {
+  BringItem,
+  BringItemsResponse,
+  DashboardResponse,
+  Task,
+  TaskListResponse,
+} from '../types/api'
 
 const API_ROOT = '/api/v1'
 
@@ -62,4 +68,30 @@ export function clearCsrfToken() {
 
 export const dashboardApi = {
   getDashboard: (signal?: AbortSignal) => request<DashboardResponse>('/dashboard', { signal }),
+}
+
+export const tasksApi = {
+  list: (signal?: AbortSignal) => request<TaskListResponse>('/tasks', { signal }),
+  create: (title: string) =>
+    request<Task>('/tasks', { method: 'POST', body: { title }, csrf: true }),
+  setCompleted: (id: string, completed: boolean) =>
+    request<Task>(`/tasks/${id}`, { method: 'PATCH', body: { completed }, csrf: true }),
+  remove: (id: string) => request<undefined>(`/tasks/${id}`, { method: 'DELETE', csrf: true }),
+}
+
+export const bringApi = {
+  items: (signal?: AbortSignal) => request<BringItemsResponse>('/bring/items', { signal }),
+  add: (name: string, specification: string, clientMutationId: string) =>
+    request<BringItem>('/bring/items', {
+      method: 'POST',
+      csrf: true,
+      body: { name, specification, client_mutation_id: clientMutationId },
+    }),
+  complete: (itemId: string, clientMutationId: string) =>
+    request<BringItemsResponse>(`/bring/items/${encodeURIComponent(itemId)}/complete`, {
+      method: 'POST',
+      csrf: true,
+      body: { client_mutation_id: clientMutationId },
+    }),
+  eventsUrl: `${API_ROOT}/bring/events`,
 }

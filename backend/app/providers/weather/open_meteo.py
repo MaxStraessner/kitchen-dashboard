@@ -63,9 +63,7 @@ def map_weather_payload(payload: dict[str, Any], location: str, timezone: str) -
                 condition=forecast_condition,
                 weather_code=forecast_code,
                 icon=forecast_icon,
-                precipitation_probability=int(
-                    daily["precipitation_probability_max"][index]
-                ),
+                precipitation_probability=int(daily["precipitation_probability_max"][index]),
                 high=round(float(daily["temperature_2m_max"][index]), 1),
                 low=round(float(daily["temperature_2m_min"][index]), 1),
             )
@@ -98,8 +96,7 @@ class OpenMeteoProvider:
             "longitude": longitude,
             "current": "temperature_2m,weather_code,is_day,wind_speed_10m",
             "daily": (
-                "weather_code,temperature_2m_max,temperature_2m_min,"
-                "precipitation_probability_max"
+                "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
             ),
             "timezone": timezone,
             "forecast_days": 7,

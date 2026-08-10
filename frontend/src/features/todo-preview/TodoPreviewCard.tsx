@@ -1,18 +1,13 @@
-import { Check, Circle, Plus, Sparkles } from 'lucide-react'
+import { Circle, Sparkles } from 'lucide-react'
 
 import { Card } from '../../components/Card'
+import { useTasks } from '../../hooks/useTasks'
 
-const tasks = [
-  { title: 'Küche gründlich putzen', due: 'Heute', done: false },
-  { title: 'Blumen gießen', due: 'Heute', done: false },
-  { title: 'Wäsche waschen', due: 'Morgen', done: false },
-  { title: 'Papierkram erledigen', due: 'Freitag', done: false },
-  { title: 'Müll herausbringen', due: 'Erledigt', done: true },
-]
-
-/** Replaceable static preview for the later shared-tasks feature. */
+/** Dashboard preview: intentionally read-only; task management lives in settings. */
 export function TodoPreviewCard() {
-  const open = tasks.filter((task) => !task.done).length
+  const { tasks, loading } = useTasks()
+  const openTasks = tasks.filter((task) => !task.completed)
+
   return (
     <Card className="list-card" aria-labelledby="todo-title">
       <header className="list-header">
@@ -22,20 +17,20 @@ export function TodoPreviewCard() {
           </div>
           <h2 id="todo-title">Aufgaben</h2>
         </div>
-        <span className="count-badge">{open} offen</span>
+        <span className="count-badge">{openTasks.length} offen</span>
       </header>
-      <div className="task-list">
-        {tasks.map((task) => (
-          <div className={`task-row ${task.done ? 'is-done' : ''}`} key={task.title}>
-            {task.done ? <Check aria-hidden="true" /> : <Circle aria-hidden="true" />}
+      <div className="task-list" aria-busy={loading}>
+        {!loading && openTasks.length === 0 && <p className="task-empty">Keine offenen Aufgaben</p>}
+        {openTasks.map((task) => (
+          <div className="task-row task-row--display" key={task.id}>
+            <span className="task-status-icon" aria-hidden="true">
+              <Circle />
+            </span>
             <strong>{task.title}</strong>
-            <span>{task.due}</span>
+            <span>Offen</span>
           </div>
         ))}
       </div>
-      <button className="quiet-add" type="button" disabled>
-        <Plus aria-hidden="true" /> Aufgabe hinzufügen
-      </button>
     </Card>
   )
 }

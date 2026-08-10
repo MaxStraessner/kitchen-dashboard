@@ -7,13 +7,17 @@ from starlette.responses import Response
 
 from app.api.v1.router import router
 from app.core.config import get_settings
+from app.services.bring import get_bring_service
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    yield
+    try:
+        yield
+    finally:
+        await get_bring_service().close()
 
 
 app = FastAPI(

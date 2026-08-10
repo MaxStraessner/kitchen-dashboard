@@ -1,9 +1,10 @@
 import json
-from datetime import datetime
+from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.time import utc_now
 from app.providers.calendar.ics import IcsFetchResult
 from app.schemas.calendar import CalendarEventSchema
 from app.services.calendar import CalendarService
@@ -14,7 +15,7 @@ class MixedProvider:
         source_id = source.id  # type: ignore[attr-defined]
         if source_id == "broken":
             raise RuntimeError("https://secret.example/private.ics?token=secret")
-        start = datetime.fromisoformat("2026-07-15T10:00:00+02:00")
+        start = utc_now() + timedelta(days=1)
         return IcsFetchResult(
             source=source,  # type: ignore[arg-type]
             events=[

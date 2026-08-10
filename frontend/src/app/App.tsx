@@ -5,6 +5,7 @@ import { AdminRoute, LoginRoute, ProtectedRoute, SetupRoute } from '../auth/Rout
 import { AccountPage } from '../pages/AccountPage'
 import { LoginPage } from '../pages/LoginPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { TasksPage } from '../pages/TasksPage'
 import { SetupPage } from '../pages/SetupPage'
 import { UsersPage } from '../pages/UsersPage'
 
@@ -48,6 +49,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/tasks"
+        element={
+          <ProtectedRoute>
+            <TasksPage />
           </ProtectedRoute>
         }
       />
