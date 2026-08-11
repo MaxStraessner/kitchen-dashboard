@@ -1,4 +1,4 @@
-import { CheckSquare, Gauge, LogOut, UserRound, UsersRound } from 'lucide-react'
+import { CheckSquare, Gauge, Images, LogOut, UserRound, UsersRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthProvider'
@@ -36,6 +36,13 @@ export function SettingsPage() {
           <div>
             <h2>Aufgaben</h2>
             <p>Gemeinsame Aufgaben verwalten</p>
+          </div>
+        </Link>
+        <Link className="settings-card" to="/settings/photos">
+          <Images />
+          <div>
+            <h2>Fotos</h2>
+            <p>Familienfotos hochladen und verwalten</p>
           </div>
         </Link>
         {auth.user?.role === 'admin' && (

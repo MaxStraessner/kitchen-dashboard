@@ -1,6 +1,6 @@
 # Kitchen Dashboard
 
-A portrait-first family and kitchen dashboard for a 27-inch, 1440 × 2560 display driven by Chromium in Raspberry Pi kiosk mode. This foundation delivers the clock, real weather for Unna, a five-week multi-ICS calendar, and high-fidelity static previews for media, tasks, shopping, and household information.
+A portrait-first family and kitchen dashboard for a 27-inch, 1440 × 2560 display driven by Chromium in Raspberry Pi kiosk mode. It delivers the clock, real weather for Unna, a five-week multi-ICS calendar, shared tasks and shopping, household information, and a private family photo gallery.
 
 The visual system is purpose-built for this display: restrained dark materials, a strong typographic hierarchy, large readable cards, a dominant calendar, and no scrolling at the target viewport. It intentionally avoids an admin-dashboard aesthetic.
 
@@ -15,14 +15,15 @@ Implemented now:
 - PostgreSQL-backed normalized event cache and independent source health
 - Five-week agenda, current-month calendar, and source-derived legend
 - Explicit, realistic demo calendar when no ICS sources exist
-- Static replaceable media, task, and information features
+- Shared household tasks and a private family photo slideshow
+- Mobile photo upload and management with optimized previews
 - Bidirectional shared Bring shopping list with safe server-side credentials
 - React component tests, FastAPI tests, and Playwright kiosk checks
 - Development and production-oriented Docker Compose definitions
 
 Also implemented: one-time household setup, username/password accounts, administrator and member roles, Argon2id password hashing, server-side sessions, CSRF protection, personal account settings, and administrator user management.
 
-Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a mobile app, editable tasks, Spotify API, WebSockets, devices, Home Assistant, cameras, N8N, reverse proxy, or domain configuration.
+Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a separate mobile app, WebSockets, devices, Home Assistant, cameras, N8N, reverse proxy, or domain configuration.
 
 ## Architecture
 
@@ -33,7 +34,9 @@ Chromium / React
 FastAPI ── Open-Meteo
    │    └─ private ICS feeds
    ▼
-PostgreSQL (weather cache, normalized events, source status)
+PostgreSQL (application data and photo metadata)
+   │
+   └── persistent media volume (optimized WebP files)
 ```
 
 The monorepo contains `frontend`, `backend`, `deploy`, and `docs`. Frontend features only use the central API client. Backend API, services, providers, schemas, configuration, and persistence are separate modules. See [architecture](docs/architecture.md).
@@ -96,15 +99,15 @@ With an empty database, the application opens `/setup`. Enter the household name
 
 Administrators open the quiet settings button in the upper-right corner, then **Benutzerverwaltung**, to add members, change roles, activate or deactivate accounts, reset temporary passwords, or revoke sessions. A temporary password must be changed before the dashboard becomes available. Members can use **Mein Konto** to change their display name or password and revoke their other sessions.
 
-Normal sessions last up to 24 hours. **Angemeldet bleiben** extends the maximum to 30 days. Both values are configurable. Stopping Compose without `--volumes` preserves the PostgreSQL volume. For a completely fresh local setup, intentionally remove only this project's database volume after stopping it:
+Normal sessions last up to 24 hours. **Angemeldet bleiben** extends the maximum to 30 days. Both values are configurable. Stopping Compose without `--volumes` preserves the PostgreSQL and media volumes. Never use `docker compose down -v`, volume pruning, or a database reset for a normal restart, build, or deployment.
 
-```powershell
-docker compose -f deploy/compose.yaml down
-docker volume rm kitchen-dashboard_kitchen-dashboard-postgres-data
-docker compose -f deploy/compose.yaml up --build
-```
+### Family photos
 
-This deletion is only for an explicit empty-database test and destroys local Kitchen Dashboard account data.
+Authenticated users manage photos under **Einstellungen → Fotos**; the dashboard tile is display-only. Members see and delete their own uploads. Administrators can manage all photos in their household. The dashboard slideshow combines all household uploads and changes every 12 seconds without controls.
+
+Uploads accept JPEG/JPG, PNG, WebP, HEIC, and HEIF up to 20 MB. Pillow and `pillow-heif` validate the actual image, apply EXIF orientation, remove unneeded metadata, constrain the long edge to 2560 pixels, and write a high-quality WebP plus a 480-pixel WebP preview. Original smartphone files are not retained.
+
+PostgreSQL stores photo metadata and ownership only. Files live in the named Docker volume `kitchen-dashboard-media-data` at `/data/media`; local directories named `media` are ignored by Git. Both Compose definitions mount this volume into the API container. Normal `docker compose up`, rebuilds, restarts, and `down` without `-v` retain it.
 
 ## Environment variables
 
@@ -129,6 +132,10 @@ This deletion is only for an explicit empty-database test and destroys local Kit
 | `BRING_EMAIL` | Bring account email; protected host secret, never commit it |
 | `BRING_PASSWORD` | Bring account password; protected host secret, never commit it |
 | `BRING_LIST_UUID` | UUID of the shared list; keep it in host configuration |
+| `PHOTO_MAX_UPLOAD_BYTES` | Original upload limit, default `20971520` (20 MB) |
+| `PHOTO_MAX_DIMENSION` | Maximum long edge for dashboard images, default `2560` |
+| `PHOTO_THUMBNAIL_MAX_DIMENSION` | Maximum long edge for previews, default `480` |
+| `PHOTO_WEBP_QUALITY` | WebP quality, default `88` |
 
 The Unna coordinates identify the city center area and are configurable for a more precise household location.
 
@@ -202,13 +209,15 @@ Playwright writes the 1440 × 2560 screenshot to `frontend/tests/artifacts/dashb
 - `GET /api/v1/dashboard`
 - `GET/POST /api/v1/bring/items`, `POST /api/v1/bring/items/{id}/complete`
 - `GET /api/v1/bring/status`, `GET /api/v1/bring/events`
+- `GET /api/v1/photos`, `POST /api/v1/photos`, `DELETE /api/v1/photos/{id}`
+- `GET /api/v1/photos/gallery`, authenticated image and thumbnail delivery
 - `GET /api/v1/setup/status`, `POST /api/v1/setup/initialize`
 - `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`
 - `GET /api/v1/auth/me`, `GET /api/v1/auth/csrf`, `POST /api/v1/auth/change-password`
 - `GET/PATCH /api/v1/account`, account password and session operations
 - `GET/POST/PATCH /api/v1/admin/users` plus reset-password and revoke-session operations
 
-Public endpoints are limited to setup status/initialization while setup is open, login, and health. Dashboard, weather, calendar, account, and administration endpoints require a valid household session. See [authentication](docs/authentication.md) and [authorization](docs/authorization.md).
+Public endpoints are limited to setup status/initialization while setup is open, login, and health. Dashboard, weather, calendar, photos, account, and administration endpoints require a valid household session. Photo mutations additionally require the existing CSRF token. See [authentication](docs/authentication.md) and [authorization](docs/authorization.md).
 
 ## Production security
 
@@ -219,7 +228,6 @@ Responses expose update, stale, and demo metadata but never source URLs or raw i
 ## Known limitations
 
 - Week and month navigation are intentionally disabled visual preparations; agenda is the working view.
-- Task and media preview controls do not mutate data.
 - Bring is an unofficial interface and external app changes can take up to 90 seconds to appear.
 - A cold-start provider outage has no historical weather cache, so a quiet placeholder is returned.
 - The written visual specification was available during implementation, but no separate reference image file was attached for pixel-level comparison.

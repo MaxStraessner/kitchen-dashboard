@@ -15,6 +15,7 @@ This is the operational source of truth for Kitchen Dashboard. It uses the exist
 | Protected production environment | `/docker/kitchen-dashboard/.env` (mode `0600`, root-owned) |
 | Compose project | `kitchen-dashboard` |
 | Persistent database volume | `kitchen-dashboard_kitchen-dashboard-postgres-data` |
+| Persistent media volume | `kitchen-dashboard_kitchen-dashboard-media-data` mounted at `/data/media` |
 | Docker networks | `kitchen-dashboard_kitchen-dashboard-app`, `kitchen-dashboard_kitchen-dashboard-data` |
 | Current internal HTTP endpoint | `http://127.0.0.1:18080` on the VPS |
 | Direct production URL | `http://152.239.117.234:18080` |
@@ -27,7 +28,7 @@ The existing Traefik proxy is owned by the separate `n8n` project and is not cha
 
 With `AUTH_COOKIE_SECURE=false`, the application uses unprefixed session and CSRF cookie names and omits the Secure flag so browsers can retain the session over HTTP. This is an explicit operational exception: credentials and cookies are not encrypted in transit. A future HTTPS deployment should restore `AUTH_COOKIE_SECURE=true`, use an HTTPS origin, and will automatically switch back to `__Host-` cookie names.
 
-Never commit or print `.env` values, private ICS URLs, Bring credentials, database credentials, or SSH private keys. Do not run `docker system prune`, `docker volume prune`, `docker volume rm`, or `docker compose down -v` for this project.
+Never commit or print `.env` values, private ICS URLs, Bring credentials, database credentials, uploaded photos, or SSH private keys. Do not run `docker system prune`, `docker volume prune`, `docker volume rm`, or `docker compose down -v` for this project.
 
 ## Deploy main
 
@@ -39,7 +40,9 @@ From the repository root on Windows:
 
 The script first confirms the approved remote, an unchanged tracked worktree, the protected environment file, and an exact `origin/main` checkout. It refuses to deploy if VPS `main` is ahead of or diverges from GitHub `main`; it never resets that checkout.
 
-When a new Git commit must be deployed, the script creates a timestamped PostgreSQL dump under the ignored VPS directory `/docker/kitchen-dashboard/backups/`, builds only the API and frontend images, and runs `docker compose up -d`. It does not run a database reset, `down`, pruning, or volume removal. An unchanged commit only runs the health verification.
+When a new Git commit must be deployed, the script creates a timestamped PostgreSQL dump and, when an existing media mount is present, a compressed media backup under the ignored VPS directory `/docker/kitchen-dashboard/backups/`. It then builds only the API and frontend images and runs `docker compose up -d`. It does not run a database reset, `down`, pruning, or volume removal. An unchanged commit only runs the health verification.
+
+The first photo-enabled deployment creates the named media volume without deleting or replacing existing volumes. Every later changed deployment backs up `/data/media` before rebuilding. Include both `predeploy-*.sql.gz` and `media-predeploy-*.tar.gz` in the host backup retention policy.
 
 It verifies the protected environment has mode `0600`, waits up to two minutes for all three containers to become healthy, then verifies `/healthz`, the proxied `/api/v1/health`, and the database component. On success it prints the exact deployed commit. A nonzero exit code means no successful deployment claim was made.
 

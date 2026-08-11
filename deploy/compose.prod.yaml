@@ -43,6 +43,13 @@ services:
       BRING_EMAIL: ${BRING_EMAIL:-}
       BRING_PASSWORD: ${BRING_PASSWORD:-}
       BRING_LIST_UUID: ${BRING_LIST_UUID:-}
+      MEDIA_ROOT: /data/media
+      PHOTO_MAX_UPLOAD_BYTES: ${PHOTO_MAX_UPLOAD_BYTES:-20971520}
+      PHOTO_MAX_DIMENSION: ${PHOTO_MAX_DIMENSION:-2560}
+      PHOTO_THUMBNAIL_MAX_DIMENSION: ${PHOTO_THUMBNAIL_MAX_DIMENSION:-480}
+      PHOTO_WEBP_QUALITY: ${PHOTO_WEBP_QUALITY:-88}
+    volumes:
+      - kitchen-dashboard-media-data:/data/media
     restart: unless-stopped
     depends_on:
       kitchen-dashboard-postgres:
@@ -77,3 +84,4 @@ networks:
 
 volumes:
   kitchen-dashboard-postgres-data:
+  kitchen-dashboard-media-data:

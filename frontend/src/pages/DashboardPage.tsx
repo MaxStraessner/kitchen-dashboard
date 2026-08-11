@@ -3,7 +3,7 @@ import { CloudOff } from 'lucide-react'
 import { CalendarPanel } from '../features/calendar/CalendarPanel'
 import { ClockCard } from '../features/clock/ClockCard'
 import { InfoCards } from '../features/info-cards/InfoCards'
-import { MediaPreviewCard } from '../features/media-preview/MediaPreviewCard'
+import { PhotoGalleryCard } from '../features/photos/PhotoGalleryCard'
 import { ShoppingPreviewCard } from '../features/shopping-preview/ShoppingPreviewCard'
 import { TodoPreviewCard } from '../features/todo-preview/TodoPreviewCard'
 import { WeatherCard } from '../features/weather/WeatherCard'
@@ -20,7 +20,7 @@ export function DashboardPage() {
       <div className="top-grid" data-testid="top-grid">
         <ClockCard />
         <WeatherCard weather={data.weather} />
-        <MediaPreviewCard />
+        <PhotoGalleryCard />
       </div>
       <CalendarPanel calendar={data.calendar} weather={data.weather} />
       <div className="lower-grid" data-testid="lower-grid">

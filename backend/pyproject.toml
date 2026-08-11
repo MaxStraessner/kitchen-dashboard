@@ -14,8 +14,11 @@ dependencies = [
   "fastapi==0.119.1",
   "httpx==0.28.1",
   "icalendar==6.3.1",
+  "pillow==12.3.0",
+  "pillow-heif==1.5.0",
   "pydantic-settings==2.10.1",
   "pwdlib[argon2]==0.3.0",
+  "python-multipart==0.0.32",
   "python-dateutil==2.9.0.post0",
   "recurring-ical-events==3.8.0",
   "sqlalchemy[asyncio]==2.0.41",
@@ -60,4 +63,8 @@ exclude = ["migrations"]
 
 [[tool.mypy.overrides]]
 module = ["icalendar", "recurring_ical_events"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["PIL", "PIL.*", "pillow_heif"]
 ignore_missing_imports = true

@@ -2,6 +2,8 @@ import type {
   BringItem,
   BringItemsResponse,
   DashboardResponse,
+  Photo,
+  PhotoListResponse,
   Task,
   TaskListResponse,
 } from '../types/api'
@@ -20,15 +22,20 @@ export class ApiError extends Error {
 
 let csrfToken: string | null = null
 
-type RequestOptions = Omit<RequestInit, 'body'> & { body?: unknown; csrf?: boolean }
+type RequestOptions = Omit<RequestInit, 'body'> & {
+  body?: unknown
+  formData?: FormData
+  csrf?: boolean
+}
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   let response: Response
   try {
-    const headers = new Headers(options.headers)
+    const { body, csrf, formData, ...requestInit } = options
+    const headers = new Headers(requestInit.headers)
     headers.set('Accept', 'application/json')
-    if (options.body !== undefined) headers.set('Content-Type', 'application/json')
-    if (options.csrf) {
+    if (body !== undefined) headers.set('Content-Type', 'application/json')
+    if (csrf) {
       if (!csrfToken) {
         const csrfResponse = await request<{ csrfToken: string }>('/auth/csrf')
         csrfToken = csrfResponse.csrfToken
@@ -36,10 +43,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers.set('X-CSRF-Token', csrfToken)
     }
     response = await fetch(`${API_ROOT}${path}`, {
-      ...options,
+      ...requestInit,
       credentials: 'include',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: formData ?? (body === undefined ? undefined : JSON.stringify(body)),
     })
   } catch {
     throw new ApiError('Backend nicht erreichbar')
@@ -77,6 +84,18 @@ export const tasksApi = {
   setCompleted: (id: string, completed: boolean) =>
     request<Task>(`/tasks/${id}`, { method: 'PATCH', body: { completed }, csrf: true }),
   remove: (id: string) => request<undefined>(`/tasks/${id}`, { method: 'DELETE', csrf: true }),
+}
+
+export const photosApi = {
+  list: (signal?: AbortSignal) => request<PhotoListResponse>('/photos', { signal }),
+  gallery: (signal?: AbortSignal) => request<PhotoListResponse>('/photos/gallery', { signal }),
+  upload: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file, file.name)
+    return request<Photo>('/photos', { method: 'POST', formData, csrf: true })
+  },
+  remove: (id: string) =>
+    request<undefined>(`/photos/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
 }
 
 export const bringApi = {

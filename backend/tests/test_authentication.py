@@ -173,6 +173,8 @@ async def test_protected_endpoints_health_and_csrf(client: AsyncClient) -> None:
         "/bring/items",
         "/bring/status",
         "/bring/events",
+        "/photos",
+        "/photos/gallery",
     ):
         assert (await client.get(f"/api/v1{path}")).status_code == 401
     await setup(client)

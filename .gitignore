@@ -20,3 +20,5 @@ Thumbs.db
 .vscode/
 .codex-deploy/
 backups/
+media/
+backend/media/

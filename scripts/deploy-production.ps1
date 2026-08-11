@@ -86,12 +86,21 @@ compose=(docker compose --env-file "$environment_file" -f "$compose_file")
 if [ "$previous_commit" != "$deployed_commit" ]; then
   backup_directory="$project_directory/backups"
   backup_file="$backup_directory/predeploy-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+  media_backup_file="$backup_directory/media-predeploy-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
   mkdir -p "$backup_directory"
   umask 077
 
   printf 'Creating PostgreSQL backup: %s\n' "$backup_file"
   "${compose[@]}" exec -T kitchen-dashboard-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip -c > "$backup_file"
   test -s "$backup_file" || fail "database backup is empty: $backup_file"
+
+  if "${compose[@]}" exec -T kitchen-dashboard-api python -c 'from pathlib import Path; raise SystemExit(0 if Path("/data/media").is_dir() else 1)'; then
+    printf 'Creating media backup: %s\n' "$media_backup_file"
+    "${compose[@]}" exec -T kitchen-dashboard-api python -c 'import sys, tarfile; archive = tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz"); archive.add("/data/media", arcname="."); archive.close()' > "$media_backup_file"
+    test -s "$media_backup_file" || fail "media backup is empty: $media_backup_file"
+  else
+    printf 'No existing media mount found; skipping the initial media backup.\n'
+  fi
 
   "${compose[@]}" build kitchen-dashboard-api kitchen-dashboard-web
   "${compose[@]}" up -d

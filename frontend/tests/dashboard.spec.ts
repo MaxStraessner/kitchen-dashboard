@@ -50,6 +50,13 @@ async function mockAuthentication(page: Page) {
       }),
     }),
   )
+  await page.route('**/api/v1/photos/gallery', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"photos":[]}',
+    }),
+  )
 }
 
 function expectNoOverlap(
