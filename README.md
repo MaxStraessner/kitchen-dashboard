@@ -119,7 +119,7 @@ This deletion is only for an explicit empty-database test and destroys local Kit
 | `WEATHER_CACHE_TTL_SECONDS` | `900` |
 | `CALENDAR_CACHE_TTL_SECONDS` | `900` |
 | `CALENDAR_SOURCES_JSON` | JSON array of private sources; `[]` enables demo mode |
-| `AUTH_COOKIE_SECURE` | `false` in development; must be `true` in production |
+| `AUTH_COOKIE_SECURE` | Defaults to `false` in development and `true` in production Compose; set explicitly to `false` only for the approved direct-HTTP deployment |
 | `AUTH_SESSION_TTL_HOURS` | Normal session maximum, default `24` |
 | `AUTH_REMEMBER_TTL_DAYS` | Remembered session maximum, default `30` |
 | `AUTH_LOGIN_MAX_ATTEMPTS` | Failed attempts in the window, default `5` |
@@ -212,7 +212,7 @@ Public endpoints are limited to setup status/initialization while setup is open,
 
 ## Production security
 
-Password entry and the one-time setup must only be exposed over HTTPS. Production refuses insecure session-cookie configuration and uses the `__Host-kitchen_session` cookie. Never enter credentials over a raw HTTP test port such as `18080`; complete setup immediately after a protected HTTPS deployment. There are no standard credentials.
+Production defaults to secure `__Host-` session and CSRF cookies. The current direct-IP deployment is an explicit HTTP exception configured only in the protected VPS environment with `AUTH_COOKIE_SECURE=false`; in that mode the application uses unprefixed cookies without the Secure flag. Restore `AUTH_COOKIE_SECURE=true` when moving to HTTPS. There are no standard credentials.
 
 Responses expose update, stale, and demo metadata but never source URLs or raw internal errors.
 

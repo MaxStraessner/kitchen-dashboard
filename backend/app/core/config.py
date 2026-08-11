@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,12 +53,6 @@ class Settings(BaseSettings):
     auth_login_window_minutes: int = Field(default=15, ge=1, le=1440)
     auth_allowed_origins: str = "http://localhost:8080,http://localhost:5173"
 
-    @model_validator(mode="after")
-    def validate_auth_cookie(self) -> Settings:
-        if self.app_env == "production" and not self.auth_cookie_secure:
-            raise ValueError("AUTH_COOKIE_SECURE must be true in production")
-        return self
-
     @field_validator("calendar_sources_json")
     @classmethod
     def validate_calendar_sources(cls, value: str) -> str:
@@ -90,7 +84,11 @@ class Settings(BaseSettings):
 
     @property
     def auth_cookie_name(self) -> str:
-        return "__Host-kitchen_session" if self.app_env == "production" else "kitchen_session"
+        return "__Host-kitchen_session" if self.auth_cookie_secure else "kitchen_session"
+
+    @property
+    def auth_csrf_cookie_name(self) -> str:
+        return "__Host-kitchen_csrf" if self.auth_cookie_secure else "kitchen_csrf"
 
 
 @lru_cache

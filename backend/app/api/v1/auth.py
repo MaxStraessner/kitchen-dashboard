@@ -55,8 +55,7 @@ async def csrf(
     auth: AuthContext = Depends(current_auth),
     settings: Settings = Depends(get_settings),
 ) -> CsrfResponse:
-    name = "__Host-kitchen_csrf" if settings.app_env == "production" else "kitchen_csrf"
-    value = request.cookies.get(name)
+    value = request.cookies.get(settings.auth_csrf_cookie_name)
     if not value or token_hash(value) != auth.auth_session.csrf_token_hash:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Anmeldung erforderlich.")
     return CsrfResponse(csrf_token=value)
