@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.auth.passwords import verify_password
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.time import utc_now
 from app.database.base import Base
 from app.database.models import (
@@ -19,7 +19,14 @@ from app.database.models import (
     LoginAttempt,
     User,
 )
-from app.services.authentication_service import initialize_setup, make_session, set_session_cookie
+from app.main import app
+from app.services.authentication_service import (
+    clear_session_cookie,
+    initialize_setup,
+    make_session,
+    set_csrf_cookie,
+    set_session_cookie,
+)
 
 SETUP = {
     "householdName": "Familie",
@@ -368,11 +375,60 @@ async def test_login_limit_is_persistent_and_expires(
     assert accepted.status_code == 200
 
 
-def test_production_cookie_is_secure_and_configuration_rejects_insecure() -> None:
-    settings = Settings(app_env="production", auth_cookie_secure=True)
-    from fastapi import Response
+def test_cookie_names_and_flags_follow_secure_setting() -> None:
+    modes = (
+        (True, "__Host-kitchen_session", "__Host-kitchen_csrf"),
+        (False, "kitchen_session", "kitchen_csrf"),
+    )
 
-    response = Response()
-    set_session_cookie(response, "opaque", settings, False)
-    value = response.headers["set-cookie"]
-    assert "Secure" in value and "HttpOnly" in value and "SameSite=lax" in value
+    for secure, session_name, csrf_name in modes:
+        settings = Settings(app_env="production", auth_cookie_secure=secure)
+        response = Response()
+        set_session_cookie(response, "opaque-session", settings, False)
+        set_csrf_cookie(response, "opaque-csrf", settings, False)
+        cookies = response.headers.getlist("set-cookie")
+
+        session_cookie = next(value for value in cookies if value.startswith(f"{session_name}="))
+        csrf_cookie = next(value for value in cookies if value.startswith(f"{csrf_name}="))
+        assert "HttpOnly" in session_cookie
+        assert "HttpOnly" not in csrf_cookie
+        assert "SameSite=lax" in session_cookie
+        assert "SameSite=lax" in csrf_cookie
+        assert ("Secure" in session_cookie) is secure
+        assert ("Secure" in csrf_cookie) is secure
+
+        deleted = Response()
+        clear_session_cookie(deleted, settings)
+        cleared_cookies = deleted.headers.getlist("set-cookie")
+        assert any(value.startswith(f"{session_name}=") for value in cleared_cookies)
+        assert any(value.startswith(f"{csrf_name}=") for value in cleared_cookies)
+        assert all(("Secure" in value) is secure for value in cleared_cookies)
+
+
+async def test_production_http_login_cookie_persists_for_auth_me(client: AsyncClient) -> None:
+    settings = Settings(
+        app_env="production",
+        auth_cookie_secure=False,
+        auth_allowed_origins="http://test",
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    initial_user = await setup(client)
+    await client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": await csrf(client)})
+    client.cookies.clear()
+
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        json={"username": SETUP["username"], "password": SETUP["password"], "rememberMe": True},
+    )
+    assert login_response.status_code == 200
+    cookies = login_response.headers.get_list("set-cookie")
+    assert any(value.startswith("kitchen_session=") and "Secure" not in value for value in cookies)
+    assert any(value.startswith("kitchen_csrf=") and "Secure" not in value for value in cookies)
+    assert "__Host-kitchen_session" not in client.cookies
+    assert "__Host-kitchen_csrf" not in client.cookies
+
+    current_user_response = await client.get("/api/v1/auth/me")
+    assert current_user_response.status_code == 200
+    assert current_user_response.json()["id"] == initial_user["id"]
+    assert (await client.get("/api/v1/auth/csrf")).status_code == 200

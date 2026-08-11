@@ -17,15 +17,15 @@ This is the operational source of truth for Kitchen Dashboard. It uses the exist
 | Persistent database volume | `kitchen-dashboard_kitchen-dashboard-postgres-data` |
 | Docker networks | `kitchen-dashboard_kitchen-dashboard-app`, `kitchen-dashboard_kitchen-dashboard-data` |
 | Current internal HTTP endpoint | `http://127.0.0.1:18080` on the VPS |
-| User-facing production URL | Not configured; no Kitchen Dashboard HTTPS proxy route exists yet |
+| Direct production URL | `http://152.239.117.234:18080` |
 
 The frontend, API, and PostgreSQL containers belong only to this Compose project. PostgreSQL is not published on a host port. The VPS also hosts independent `n8n`, `nuamkasse-ip`, and `telefonagent` projects; never restart, rebuild, or alter them while deploying Kitchen Dashboard.
 
 ## Security and routing status
 
-The existing Traefik proxy is owned by the separate `n8n` project. No Kitchen Dashboard route was found in its configuration. Port `18080` is therefore only a direct HTTP service check, **not** a suitable user-facing production URL: production session cookies require HTTPS.
+The existing Traefik proxy is owned by the separate `n8n` project and is not changed by Kitchen Dashboard deployments. The current deployment deliberately supports direct HTTP access on port `18080` by setting `AUTH_COOKIE_SECURE=false` and `AUTH_ALLOWED_ORIGINS=http://152.239.117.234:18080` in the protected production environment.
 
-Do not enter credentials or complete setup through `http://<VPS-IP>:18080`. A future public HTTPS route must be added deliberately to the separate reverse-proxy configuration, with a matching `AUTH_ALLOWED_ORIGINS` value in the protected VPS environment. That routing change is outside the normal application deployment and must be reviewed separately.
+With `AUTH_COOKIE_SECURE=false`, the application uses unprefixed session and CSRF cookie names and omits the Secure flag so browsers can retain the session over HTTP. This is an explicit operational exception: credentials and cookies are not encrypted in transit. A future HTTPS deployment should restore `AUTH_COOKIE_SECURE=true`, use an HTTPS origin, and will automatically switch back to `__Host-` cookie names.
 
 Never commit or print `.env` values, private ICS URLs, Bring credentials, database credentials, or SSH private keys. Do not run `docker system prune`, `docker volume prune`, `docker volume rm`, or `docker compose down -v` for this project.
 

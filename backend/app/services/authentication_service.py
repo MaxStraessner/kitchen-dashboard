@@ -83,9 +83,8 @@ def set_csrf_cookie(response: Response, csrf: str, settings: Settings, remember:
         if remember
         else settings.auth_session_ttl_hours * 3600
     )
-    name = "__Host-kitchen_csrf" if settings.app_env == "production" else "kitchen_csrf"
     response.set_cookie(
-        key=name,
+        key=settings.auth_csrf_cookie_name,
         value=csrf,
         max_age=max_age,
         httponly=False,
@@ -103,8 +102,12 @@ def clear_session_cookie(response: Response, settings: Settings) -> None:
         httponly=True,
         samesite="lax",
     )
-    csrf_name = "__Host-kitchen_csrf" if settings.app_env == "production" else "kitchen_csrf"
-    response.delete_cookie(csrf_name, path="/", secure=settings.auth_cookie_secure, samesite="lax")
+    response.delete_cookie(
+        settings.auth_csrf_cookie_name,
+        path="/",
+        secure=settings.auth_cookie_secure,
+        samesite="lax",
+    )
 
 
 def make_session(
