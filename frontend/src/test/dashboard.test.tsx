@@ -59,7 +59,9 @@ beforeEach(() => {
                   },
                 ],
               }
-            : createFallbackDashboard()
+            : url.endsWith('/photos/gallery')
+              ? { photos: [] }
+              : createFallbackDashboard()
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(payload) })
     }),
   )
@@ -72,7 +74,8 @@ test('dashboard renders every primary feature', async () => {
   await waitFor(() => expect(screen.getByText('Familienkalender')).toBeInTheDocument())
   expect(screen.getByLabelText('Uhrzeit und Datum')).toBeInTheDocument()
   expect(screen.getByLabelText(/Wetter für Unna/)).toBeInTheDocument()
-  expect(screen.getByLabelText('Medienvorschau')).toBeInTheDocument()
+  expect(screen.getByLabelText('Familienfotos')).toBeInTheDocument()
+  expect(screen.getByText('Noch keine Fotos')).toBeInTheDocument()
   expect(screen.getAllByText('Keine Termine')).toHaveLength(7)
   expect(screen.getByLabelText('Monatskalender')).toBeInTheDocument()
   expect(screen.getByText('Aufgaben')).toBeInTheDocument()
@@ -131,6 +134,12 @@ test('backend failure keeps the composed dashboard visible', async () => {
           ok: true,
           status: 200,
           json: () => Promise.resolve({ tasks: [] }),
+        })
+      if (url.endsWith('/photos/gallery'))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ photos: [] }),
         })
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(fallback) })
     }),

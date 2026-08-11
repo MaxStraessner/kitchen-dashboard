@@ -87,6 +87,27 @@ export interface TaskListResponse {
   tasks: Task[]
 }
 
+export interface Photo {
+  id: string
+  uploaderUserId: string
+  uploaderDisplayName: string
+  originalName: string
+  originalMimeType: string
+  mimeType: string
+  originalFileSize: number
+  fileSize: number
+  width: number
+  height: number
+  uploadedAt: string
+  imageUrl: string
+  thumbnailUrl: string
+  canDelete: boolean
+}
+
+export interface PhotoListResponse {
+  photos: Photo[]
+}
+
 export type BringState =
   | 'ok'
   | 'disabled'

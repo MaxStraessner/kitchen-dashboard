@@ -4,6 +4,7 @@ import { DashboardPage } from '../pages/DashboardPage'
 import { AdminRoute, LoginRoute, ProtectedRoute, SetupRoute } from '../auth/RouteGuards'
 import { AccountPage } from '../pages/AccountPage'
 import { LoginPage } from '../pages/LoginPage'
+import { PhotosPage } from '../pages/PhotosPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { TasksPage } from '../pages/TasksPage'
 import { SetupPage } from '../pages/SetupPage'
@@ -57,6 +58,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <TasksPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/photos"
+        element={
+          <ProtectedRoute>
+            <PhotosPage />
           </ProtectedRoute>
         }
       />

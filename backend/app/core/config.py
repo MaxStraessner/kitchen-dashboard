@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
     auth_login_max_attempts: int = Field(default=5, ge=1, le=50)
     auth_login_window_minutes: int = Field(default=15, ge=1, le=1440)
     auth_allowed_origins: str = "http://localhost:8080,http://localhost:5173"
+    media_root: Path = Path("media")
+    photo_max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
+    photo_max_dimension: int = Field(default=2560, ge=640, le=4096)
+    photo_thumbnail_max_dimension: int = Field(default=480, ge=160, le=1024)
+    photo_webp_quality: int = Field(default=88, ge=75, le=95)
 
     @field_validator("calendar_sources_json")
     @classmethod
