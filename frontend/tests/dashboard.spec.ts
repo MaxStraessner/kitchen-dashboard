@@ -124,6 +124,102 @@ test('1440×2560 kiosk layout is complete, bounded, and non-overlapping', async 
   await page.screenshot({ path: 'tests/artifacts/dashboard-1440x2560.png', fullPage: true })
 })
 
+test('landscape calendar stays bounded and keeps following dashboard sections reachable', async ({
+  page,
+}) => {
+  await mockAuthentication(page)
+  const dashboard = createFallbackDashboard(new Date('2026-08-10T12:00:00+02:00'))
+  const busyForecast = dashboard.weather.data.forecast[1]
+  if (!busyForecast) throw new Error('Landscape test requires a second forecast day')
+  const busyDate = busyForecast.date
+  dashboard.calendar.events = Array.from({ length: 30 }, (_, index) => ({
+    id: `landscape-event-${String(index)}`,
+    calendarId: 'family',
+    calendarName: 'Familie',
+    title: `Landscape Termin ${String(index + 1)}`,
+    start: `${busyDate}T10:00:00+02:00`,
+    end: `${busyDate}T11:00:00+02:00`,
+    allDay: false,
+    location: null,
+    description: null,
+    color: '#5fa8ff',
+    source: 'test',
+    lastModified: null,
+    cancelled: false,
+    stale: false,
+  }))
+  await page.route('**/api/v1/dashboard', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboard),
+    }),
+  )
+
+  for (const viewport of [
+    { width: 2039, height: 986 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+    await expect(page.getByText('Familienkalender')).toBeVisible()
+
+    const layout = await page.evaluate(() => {
+      const bounds = (selector: string) => {
+        const node = document.querySelector<HTMLElement>(selector)
+        if (!node) throw new Error(`Missing dashboard region: ${selector}`)
+        const rect = node.getBoundingClientRect()
+        return {
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        }
+      }
+      const agenda = document.querySelector<HTMLElement>('.agenda-list')
+      if (!agenda) throw new Error('Missing calendar agenda')
+
+      return {
+        calendar: bounds('.calendar-card'),
+        month: bounds('.month-calendar'),
+        lower: bounds('.lower-grid'),
+        info: bounds('.info-grid'),
+        agendaClientHeight: agenda.clientHeight,
+        agendaScrollHeight: agenda.scrollHeight,
+        agendaOverflowY: getComputedStyle(agenda).overflowY,
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+      }
+    })
+
+    expect(layout.calendar.height).toBeGreaterThanOrEqual(649)
+    expect(layout.calendar.height).toBeLessThanOrEqual(901)
+    expect(layout.agendaOverflowY).toBe('auto')
+    expect(layout.agendaScrollHeight).toBeGreaterThan(layout.agendaClientHeight)
+    expect(layout.month.top).toBeGreaterThanOrEqual(layout.calendar.top)
+    expect(layout.month.bottom).toBeLessThanOrEqual(layout.calendar.bottom)
+    expect(layout.lower.top - layout.calendar.bottom).toBeLessThan(50)
+    expect(layout.info.top - layout.lower.bottom).toBeLessThan(50)
+    expect(layout.scrollHeight).toBeLessThan(3200)
+    expect(layout.scrollWidth).toBe(layout.clientWidth)
+
+    for (const region of [
+      page.getByText('Aufgaben'),
+      page.getByRole('heading', { name: 'Einkaufsliste' }),
+      page.getByLabel('Geburtstags-Countdown für Hannah'),
+      page.getByLabel('Geburtstags-Countdown für Gabriel'),
+      page.getByText('WLAN Gastzugang'),
+      page.getByText('Spruch des Tages'),
+    ]) {
+      await region.scrollIntoViewIfNeeded()
+      await expect(region).toBeInViewport()
+    }
+  }
+})
+
 test('info cards and guest wifi QR remain responsive on smartphone, tablet and kiosk', async ({
   page,
 }) => {
