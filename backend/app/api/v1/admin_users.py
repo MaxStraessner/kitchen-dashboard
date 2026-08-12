@@ -1,6 +1,7 @@
+from secrets import token_urlsafe
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -192,6 +193,52 @@ async def update_user(
             status.HTTP_409_CONFLICT, "Dieser Benutzername ist bereits vergeben."
         ) from exc
     return present(user, membership)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: str,
+    auth: AuthContext = Depends(valid_csrf),
+    database: AsyncSession = Depends(get_session),
+) -> Response:
+    if auth.membership.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Administratorrechte erforderlich.")
+    if user_id == auth.user.id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Das eigene Administratorkonto kann nicht gelöscht werden.",
+        )
+
+    user, membership = await load_user(database, auth.household.id, user_id)
+    await ensure_not_last_admin(
+        database,
+        auth.household.id,
+        user,
+        membership,
+        new_active=False,
+    )
+
+    membership_count = await database.scalar(
+        select(func.count(HouseholdMembership.id)).where(HouseholdMembership.user_id == user.id)
+    )
+    add_audit(database, "user_deleted", auth.household.id, auth.user.id, user.id)
+    await database.delete(membership)
+
+    if (membership_count or 0) <= 1:
+        now = utc_now()
+        user.username = f"deleted-{user.id[:24]}"
+        user.username_normalized = user.username
+        user.display_name = "Gelöschtes Profil"
+        user.password_hash = hash_password(token_urlsafe(48))
+        user.is_active = False
+        user.must_change_password = False
+        user.last_login_at = None
+        user.password_changed_at = now
+        user.updated_at = now
+        await revoke_sessions(database, user.id)
+
+    await database.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{user_id}/reset-password", response_model=MessageResponse)

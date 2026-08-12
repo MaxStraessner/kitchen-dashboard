@@ -325,6 +325,65 @@ async def test_admin_update_reset_deactivate_and_case_insensitive_uniqueness(
     assert login_response.status_code == 401
 
 
+async def test_admin_can_delete_user_without_losing_attributed_data(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    await setup(client)
+    token = await csrf(client)
+    admin_id = (await client.get("/api/v1/auth/me")).json()["id"]
+    self_delete = await client.delete(
+        f"/api/v1/admin/users/{admin_id}", headers={"X-CSRF-Token": token}
+    )
+    assert self_delete.status_code == 409
+
+    payload = {
+        "displayName": "Jessica",
+        "username": "Jessica",
+        "role": "member",
+        "isActive": True,
+        "password": "vorläufiges Passwort 123",
+        "passwordConfirmation": "vorläufiges Passwort 123",
+    }
+    created = await client.post(
+        "/api/v1/admin/users", headers={"X-CSRF-Token": token}, json=payload
+    )
+    assert created.status_code == 201
+    user_id = created.json()["id"]
+    extra_session, _, _ = make_session(user_id, False, None, Settings(app_env="test"))
+    session.add(extra_session)
+    await session.commit()
+
+    deleted = await client.delete(f"/api/v1/admin/users/{user_id}", headers={"X-CSRF-Token": token})
+    assert deleted.status_code == 204
+    assert deleted.content == b""
+
+    database_user = await session.get(User, user_id)
+    await session.refresh(extra_session)
+    assert database_user is not None
+    assert database_user.is_active is False
+    assert database_user.display_name == "Gelöschtes Profil"
+    assert database_user.username_normalized.startswith("deleted-")
+    assert extra_session.revoked_at is not None
+    assert (
+        await session.scalar(
+            select(func.count(HouseholdMembership.id)).where(HouseholdMembership.user_id == user_id)
+        )
+        == 0
+    )
+    assert all(user["id"] != user_id for user in (await client.get("/api/v1/admin/users")).json())
+    assert (
+        await session.scalar(
+            select(func.count(AuditEvent.id)).where(AuditEvent.event_type == "user_deleted")
+        )
+        == 1
+    )
+
+    recreated = await client.post(
+        "/api/v1/admin/users", headers={"X-CSRF-Token": token}, json=payload
+    )
+    assert recreated.status_code == 201
+
+
 async def test_logout_revokes_session_and_security_headers(
     client: AsyncClient, session: AsyncSession
 ) -> None:

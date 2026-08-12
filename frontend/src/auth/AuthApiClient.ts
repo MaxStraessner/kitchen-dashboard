@@ -41,6 +41,8 @@ export const authApi = {
     id: string,
     payload: Partial<Pick<AdminUser, 'displayName' | 'username' | 'role' | 'isActive'>>,
   ) => request<AdminUser>(`/admin/users/${id}`, { method: 'PATCH', csrf: true, body: payload }),
+  deleteUser: (id: string) =>
+    request<undefined>(`/admin/users/${id}`, { method: 'DELETE', csrf: true }),
   resetPassword: (id: string, password: string, passwordConfirmation: string) =>
     request<{ message: string }>(`/admin/users/${id}/reset-password`, {
       method: 'POST',
