@@ -23,6 +23,7 @@ from app.services.photos import (
     process_photo,
     read_upload,
     remove_photo_files,
+    validate_upload_metadata,
 )
 
 router = APIRouter(prefix="/photos", tags=["photos"])
@@ -126,6 +127,7 @@ async def upload_photo(
     settings: Settings = Depends(get_settings),
 ) -> PhotoResponse:
     try:
+        validate_upload_metadata(file.filename, file.content_type)
         contents = await read_upload(file, settings.photo_max_upload_bytes)
         processed = await run_in_threadpool(process_photo, contents, settings)
     except PhotoUploadError as exc:

@@ -55,17 +55,38 @@ test('photo tile handles zero, one and multiple photos with a quiet slideshow', 
   single.unmount()
 
   vi.useFakeTimers()
-  render(
+  const slideshow = render(
     <PhotoSlideshow
       photos={[photo('first', 'Max'), photo('second', 'Jessica'), photo('third', 'Hannah')]}
     />,
   )
   expect(screen.getByAltText('Familienfoto von Max')).toHaveClass('is-active')
   await act(() => {
-    vi.advanceTimersByTime(12_000)
+    vi.advanceTimersByTime(60_000)
     return Promise.resolve()
   })
   expect(screen.getByAltText('Familienfoto von Jessica')).toHaveClass('is-active')
+
+  slideshow.rerender(<PhotoSlideshow photos={[photo('first', 'Max'), photo('third', 'Hannah')]} />)
+  await act(() => Promise.resolve())
+  expect(screen.getByAltText('Familienfoto von Max')).toHaveClass('is-active')
+
+  slideshow.rerender(
+    <PhotoSlideshow
+      photos={[photo('first', 'Max'), photo('third', 'Hannah'), photo('fourth', 'Lena')]}
+    />,
+  )
+  await act(() => Promise.resolve())
+  await act(() => {
+    vi.advanceTimersByTime(60_000)
+    return Promise.resolve()
+  })
+  expect(screen.getByAltText('Familienfoto von Hannah')).toHaveClass('is-active')
+  await act(() => {
+    vi.advanceTimersByTime(120_000)
+    return Promise.resolve()
+  })
+  expect(screen.getByAltText('Familienfoto von Max')).toHaveClass('is-active')
 })
 
 test('photo management uploads immediately and deletes only after confirmation', async () => {
