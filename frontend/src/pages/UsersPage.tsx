@@ -6,6 +6,7 @@ import {
   Power,
   RefreshCw,
   ShieldCheck,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react'
@@ -13,6 +14,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { authApi } from '../auth/AuthApiClient'
+import { useAuth } from '../auth/AuthProvider'
 import type { AdminUser, Role } from '../auth/types'
 import { ApiError } from '../services/api'
 
@@ -25,6 +27,7 @@ const emptyForm = {
 }
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<AdminUser | null>(null)
@@ -96,6 +99,24 @@ export function UsersPage() {
     } catch (reason) {
       setError(
         reason instanceof ApiError ? reason.message : 'Passwort konnte nicht zurückgesetzt werden.',
+      )
+    }
+  }
+  async function remove(user: AdminUser) {
+    setError('')
+    setMessage('')
+    const confirmed = window.confirm(
+      `${user.displayName} (@${user.username}) endgültig aus diesem Haushalt löschen? ` +
+        'Das Konto wird deaktiviert; Aufgaben und Fotos bleiben erhalten.',
+    )
+    if (!confirmed) return
+    try {
+      await authApi.deleteUser(user.id)
+      setMessage('Benutzer wurde gelöscht.')
+      await load()
+    } catch (reason) {
+      setError(
+        reason instanceof ApiError ? reason.message : 'Benutzer konnte nicht gelöscht werden.',
       )
     }
   }
@@ -200,6 +221,19 @@ export function UsersPage() {
               >
                 <Power />
                 {user.isActive ? 'Deaktivieren' : 'Aktivieren'}
+              </button>
+              <button
+                className="quiet-button quiet-button--danger"
+                disabled={user.id === currentUser?.id}
+                title={
+                  user.id === currentUser?.id
+                    ? 'Das eigene Administratorkonto kann nicht gelöscht werden.'
+                    : undefined
+                }
+                onClick={() => void remove(user)}
+              >
+                <Trash2 />
+                Profil löschen
               </button>
             </div>
           </article>

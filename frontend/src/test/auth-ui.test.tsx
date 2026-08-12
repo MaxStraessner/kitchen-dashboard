@@ -165,3 +165,53 @@ test('temporary password opens mandatory account page', async () => {
     await screen.findByText('Bitte ändere zuerst dein vorläufiges Passwort.'),
   ).toBeInTheDocument()
 })
+
+test('administrator can delete another household profile', async () => {
+  let deleted = false
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+    const url = requestUrl(input)
+    if (url.endsWith('/setup/status')) return Promise.resolve(response({ setupRequired: false }))
+    if (url.endsWith('/auth/me')) return Promise.resolve(response(admin))
+    if (url.endsWith('/auth/csrf')) return Promise.resolve(response({ csrfToken: 'csrf' }))
+    if (url.endsWith('/admin/users/u2') && init?.method === 'DELETE') {
+      deleted = true
+      return Promise.resolve(response(undefined, 204))
+    }
+    if (url.endsWith('/admin/users'))
+      return Promise.resolve(
+        response(
+          deleted
+            ? [{ ...admin, isActive: true, createdAt: '2026-08-11T00:00:00Z' }]
+            : [
+                { ...admin, isActive: true, createdAt: '2026-08-11T00:00:00Z' },
+                {
+                  ...member,
+                  isActive: true,
+                  mustChangePassword: false,
+                  createdAt: '2026-08-11T00:00:00Z',
+                },
+              ],
+        ),
+      )
+    return Promise.resolve(response({}))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  const interaction = userEvent.setup()
+  renderAt('/settings/users')
+  const card = (await screen.findByRole('heading', { name: 'Jessica' })).closest('.user-card')
+  expect(card).not.toBeNull()
+  await interaction.click(
+    within(card as HTMLElement).getByRole('button', { name: 'Profil löschen' }),
+  )
+
+  expect(confirm).toHaveBeenCalled()
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: 'Jessica' })).not.toBeInTheDocument(),
+  )
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/admin/users/u2'),
+    expect.objectContaining({ method: 'DELETE' }),
+  )
+})
