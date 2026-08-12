@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { photosApi } from '../services/api'
 import type { Photo } from '../types/api'
+import { notifyPhotoCollectionChanged } from '../features/photos/photoEvents'
 
 interface PhotoState {
   photos: Photo[]
@@ -45,9 +46,11 @@ export function usePhotos() {
 
   const upload = useCallback(async (files: File[]) => {
     setState((current) => ({ ...current, uploading: true, error: null }))
+    let changed = false
     try {
       for (const file of files) {
         const photo = await photosApi.upload(file)
+        changed = true
         setState((current) => ({ ...current, photos: [photo, ...current.photos] }))
       }
     } catch (error) {
@@ -57,6 +60,7 @@ export function usePhotos() {
       }))
       throw error
     } finally {
+      if (changed) notifyPhotoCollectionChanged()
       setState((current) => ({ ...current, uploading: false }))
     }
   }, [])
@@ -64,6 +68,7 @@ export function usePhotos() {
   const remove = useCallback(async (id: string) => {
     try {
       await photosApi.remove(id)
+      notifyPhotoCollectionChanged()
       setState((current) => ({
         ...current,
         photos: current.photos.filter((photo) => photo.id !== id),

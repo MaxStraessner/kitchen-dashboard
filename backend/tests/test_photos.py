@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from httpx import AsyncClient
 from PIL import Image
 from pillow_heif import from_pillow
@@ -40,11 +41,17 @@ def heif_photo() -> bytes:
     return output.getvalue()
 
 
-async def upload(client: AsyncClient, token: str, data: bytes, name: str = "iphone.JPG"):
+async def upload(
+    client: AsyncClient,
+    token: str,
+    data: bytes,
+    name: str = "iphone.JPG",
+    content_type: str = "application/octet-stream",
+):
     return await client.post(
         "/api/v1/photos",
         headers={"X-CSRF-Token": token},
-        files={"file": (name, data, "application/octet-stream")},
+        files={"file": (name, data, content_type)},
     )
 
 
@@ -121,13 +128,75 @@ async def test_photo_upload_requires_auth_and_rejects_invalid_or_large_files(
     assert not (tmp_path / "photos").exists()
 
 
-async def test_heic_upload_is_converted_to_browser_compatible_webp(
+@pytest.mark.parametrize(
+    ("name", "content_type", "data", "original_mime"),
+    [
+        ("family.jpg", "image/jpeg", jpeg_photo(), "image/jpeg"),
+        ("family.png", "image/png", None, "image/png"),
+        ("family.webp", "image/webp", None, "image/webp"),
+    ],
+)
+async def test_supported_photo_formats_are_converted_to_browser_compatible_webp(
+    client: AsyncClient,
+    tmp_path: Path,
+    name: str,
+    content_type: str,
+    data: bytes | None,
+    original_mime: str,
+) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    if data is None:
+        if name.endswith(".png"):
+            output = BytesIO()
+            Image.new("RGBA", (80, 50), (22, 143, 91, 220)).save(output, format="PNG")
+            data = output.getvalue()
+        elif name.endswith(".webp"):
+            output = BytesIO()
+            Image.new("RGB", (80, 50), (22, 91, 143)).save(output, format="WEBP")
+            data = output.getvalue()
+        else:
+            data = heif_photo()
+
+    response = await upload(client, await csrf(client), data, name, content_type)
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["originalMimeType"] == original_mime
+    assert payload["mimeType"] == "image/webp"
+    served = await client.get(payload["imageUrl"])
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/webp"
+    with Image.open(BytesIO(served.content)) as converted:
+        assert converted.format == "WEBP"
+
+
+async def test_photo_upload_rejects_unsupported_filename_and_mime_type(
     client: AsyncClient, tmp_path: Path
 ) -> None:
     settings = photo_settings(tmp_path)
     app.dependency_overrides[get_settings] = lambda: settings
     await setup(client)
-    response = await upload(client, await csrf(client), heif_photo(), "IMG_0042.HEIC")
+    token = await csrf(client)
+    unsupported_extension = await upload(client, token, jpeg_photo(), "family.gif")
+    unsupported_mime = await upload(
+        client, token, jpeg_photo(), "family.jpg", "text/plain; charset=binary"
+    )
+    assert unsupported_extension.status_code == 415
+    assert unsupported_mime.status_code == 415
+
+
+@pytest.mark.parametrize(
+    ("name", "content_type"),
+    [("IMG_0042.HEIC", "image/heic"), ("IMG_0042.HEIF", "image/heif")],
+)
+async def test_heic_upload_is_converted_to_browser_compatible_webp(
+    client: AsyncClient, tmp_path: Path, name: str, content_type: str
+) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    response = await upload(client, await csrf(client), heif_photo(), name, content_type)
     assert response.status_code == 201, response.text
     payload = response.json()
     assert payload["originalMimeType"] in {"image/heic", "image/heif"}

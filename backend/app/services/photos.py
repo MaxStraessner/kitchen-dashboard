@@ -24,6 +24,19 @@ SUPPORTED_IMAGE_FORMATS = {
     "HEIF": "image/heif",
     "HEIC": "image/heic",
 }
+SUPPORTED_FILE_EXTENSIONS = {".jpg", ".jpeg", ".jpe", ".png", ".webp", ".heic", ".heif"}
+SUPPORTED_UPLOAD_MIME_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/pjpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/heic-sequence",
+    "image/heif-sequence",
+}
+GENERIC_UPLOAD_MIME_TYPES = {"", "application/octet-stream", "binary/octet-stream"}
 SAFE_STORAGE_NAME = re.compile(r"^[0-9a-f]{32}(?:-thumb)?\.webp$")
 
 
@@ -44,6 +57,28 @@ class ProcessedPhoto:
     file_size: int
     width: int
     height: int
+
+
+def validate_upload_metadata(filename: str | None, content_type: str | None) -> None:
+    normalized_name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+    extension = Path(normalized_name).suffix.lower()
+    if extension not in SUPPORTED_FILE_EXTENSIONS:
+        raise PhotoUploadError(
+            "Diese Dateiendung wird nicht unterstützt. Erlaubt sind .jpg, .jpeg, .png, "
+            ".webp, .heic und .heif.",
+            415,
+        )
+
+    normalized_type = (content_type or "").split(";", 1)[0].strip().lower()
+    if (
+        normalized_type not in SUPPORTED_UPLOAD_MIME_TYPES
+        and normalized_type not in GENERIC_UPLOAD_MIME_TYPES
+    ):
+        raise PhotoUploadError(
+            "Dieser MIME-Type wird nicht unterstützt. Erlaubt sind JPEG, PNG, WebP, HEIC "
+            "und HEIF.",
+            415,
+        )
 
 
 async def read_upload(upload: UploadFile, maximum_bytes: int) -> bytes:
