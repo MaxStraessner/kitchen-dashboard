@@ -24,27 +24,23 @@ SUPPORTED_IMAGE_FORMATS = {
     "HEIF": "image/heif",
     "HEIC": "image/heic",
 }
-SUPPORTED_FILE_EXTENSIONS = {".jpg", ".jpeg", ".jpe", ".png", ".webp", ".heic", ".heif"}
-SUPPORTED_UPLOAD_MIME_TYPES = {
-    "image/jpeg",
-    "image/jpg",
-    "image/pjpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-    "image/heic-sequence",
-    "image/heif-sequence",
-}
-GENERIC_UPLOAD_MIME_TYPES = {"", "application/octet-stream", "binary/octet-stream"}
 SAFE_STORAGE_NAME = re.compile(r"^[0-9a-f]{32}(?:-thumb)?\.webp$")
 
 
 class PhotoUploadError(Exception):
-    def __init__(self, message: str, status_code: int = 400) -> None:
+    def __init__(
+        self,
+        message: str,
+        status_code: int = 400,
+        *,
+        detected_image_type: str | None = None,
+        decoder: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+        self.detected_image_type = detected_image_type
+        self.decoder = decoder
 
 
 @dataclass(frozen=True)
@@ -57,28 +53,6 @@ class ProcessedPhoto:
     file_size: int
     width: int
     height: int
-
-
-def validate_upload_metadata(filename: str | None, content_type: str | None) -> None:
-    normalized_name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
-    extension = Path(normalized_name).suffix.lower()
-    if extension not in SUPPORTED_FILE_EXTENSIONS:
-        raise PhotoUploadError(
-            "Diese Dateiendung wird nicht unterstützt. Erlaubt sind .jpg, .jpeg, .png, "
-            ".webp, .heic und .heif.",
-            415,
-        )
-
-    normalized_type = (content_type or "").split(";", 1)[0].strip().lower()
-    if (
-        normalized_type not in SUPPORTED_UPLOAD_MIME_TYPES
-        and normalized_type not in GENERIC_UPLOAD_MIME_TYPES
-    ):
-        raise PhotoUploadError(
-            "Dieser MIME-Type wird nicht unterstützt. Erlaubt sind JPEG, PNG, WebP, HEIC "
-            "und HEIF.",
-            415,
-        )
 
 
 async def read_upload(upload: UploadFile, maximum_bytes: int) -> bytes:
@@ -127,6 +101,7 @@ def _web_image(image: Image.Image) -> Image.Image:
 
 
 def process_photo(data: bytes, settings: Settings) -> ProcessedPhoto:
+    actual_format: str | None = None
     try:
         with Image.open(BytesIO(data)) as opened:
             actual_format = (opened.format or "").upper()
@@ -135,25 +110,39 @@ def process_photo(data: bytes, settings: Settings) -> ProcessedPhoto:
                     "Dieses Bildformat wird nicht unterstützt. Erlaubt sind "
                     "JPEG, PNG, WebP, HEIC und HEIF.",
                     415,
+                    detected_image_type=actual_format or None,
+                    decoder="Pillow",
                 )
             if opened.width * opened.height > MAX_IMAGE_PIXELS:
                 raise PhotoUploadError(
                     "Die Bildauflösung ist zu groß. Erlaubt sind maximal 50 Megapixel.",
                     413,
+                    detected_image_type=actual_format,
+                    decoder="Pillow",
                 )
-            opened.seek(0)
             opened.load()
             normalized = _web_image(ImageOps.exif_transpose(opened))
     except PhotoUploadError:
         raise
+    except Image.DecompressionBombError as exc:
+        raise PhotoUploadError(
+            "Die Bildauflösung ist zu groß. Erlaubt sind maximal 50 Megapixel.",
+            413,
+            detected_image_type=actual_format,
+            decoder="Pillow",
+        ) from exc
     except (
-        Image.DecompressionBombError,
         UnidentifiedImageError,
         OSError,
         SyntaxError,
         ValueError,
     ) as exc:
-        raise PhotoUploadError("Die Datei ist kein gültiges oder lesbares Bild.", 415) from exc
+        raise PhotoUploadError(
+            "Die ausgewählte Datei konnte nicht als gültiges Bild gelesen werden.",
+            400,
+            detected_image_type=actual_format,
+            decoder="Pillow",
+        ) from exc
 
     normalized.thumbnail(
         (settings.photo_max_dimension, settings.photo_max_dimension), Image.Resampling.LANCZOS

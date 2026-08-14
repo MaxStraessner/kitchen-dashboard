@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -23,16 +24,40 @@ from app.services.photos import (
     process_photo,
     read_upload,
     remove_photo_files,
-    validate_upload_metadata,
 )
 
 router = APIRouter(prefix="/photos", tags=["photos"])
+logger = logging.getLogger(__name__)
 
 
 def safe_original_name(value: str | None) -> str:
     normalized = (value or "Foto").replace("\\", "/")
     name = normalized.rsplit("/", 1)[-1].strip()
     return (name or "Foto")[:255]
+
+
+def log_upload_failure(
+    file: UploadFile,
+    *,
+    file_size: int | None,
+    error: Exception,
+    detected_image_type: str | None = None,
+    decoder: str | None = None,
+) -> None:
+    filename = safe_original_name(file.filename)
+    cause = error.__cause__ or error
+    logger.warning(
+        "photo_upload_failed filename=%r extension=%r submitted_mime_type=%r file_size=%r "
+        "detected_image_type=%r decoder=%r exception_class=%s exception_message=%s",
+        filename,
+        Path(filename).suffix,
+        file.content_type or "",
+        file_size,
+        detected_image_type,
+        decoder,
+        type(cause).__name__,
+        str(cause),
+    )
 
 
 def photo_response(photo: Photo, uploader_name: str, can_delete: bool) -> PhotoResponse:
@@ -126,12 +151,28 @@ async def upload_photo(
     database: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> PhotoResponse:
+    contents: bytes | None = None
     try:
-        validate_upload_metadata(file.filename, file.content_type)
         contents = await read_upload(file, settings.photo_max_upload_bytes)
         processed = await run_in_threadpool(process_photo, contents, settings)
     except PhotoUploadError as exc:
+        log_upload_failure(
+            file,
+            file_size=len(contents) if contents is not None else None,
+            error=exc,
+            detected_image_type=exc.detected_image_type,
+            decoder=exc.decoder,
+        )
         raise HTTPException(exc.status_code, exc.message) from exc
+    except Exception as exc:
+        log_upload_failure(
+            file,
+            file_size=len(contents) if contents is not None else None,
+            error=exc,
+            decoder="Pillow",
+        )
+        logger.exception("Unexpected photo upload processing failure")
+        raise HTTPException(500, "Das Foto konnte nicht verarbeitet werden.") from exc
 
     photo = Photo(
         id=str(uuid4()),
@@ -155,6 +196,14 @@ async def upload_photo(
     except Exception as exc:
         await database.rollback()
         remove_photo_files(settings, processed.storage_name, processed.thumbnail_storage_name)
+        log_upload_failure(
+            file,
+            file_size=processed.original_file_size,
+            error=exc,
+            detected_image_type=processed.original_mime_type,
+            decoder="Pillow",
+        )
+        logger.exception("Photo upload database failure")
         raise HTTPException(500, "Das Foto konnte nicht gespeichert werden.") from exc
     return photo_response(photo, auth.user.display_name, True)
 

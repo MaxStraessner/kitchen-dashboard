@@ -122,6 +122,10 @@ test('photo management uploads immediately and deletes only after confirmation',
   )
 
   expect(await screen.findByRole('heading', { name: 'Fotos' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Fotos auswählen')).toHaveAttribute(
+    'accept',
+    'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.jpe,.png,.webp,.heic,.heif',
+  )
   const file = new File(['photo-content'], 'Sommer.jpg', { type: 'image/jpeg' })
   await interaction.upload(screen.getByLabelText('Fotos auswählen'), file)
   expect(await screen.findByText('new-photo.jpg')).toBeInTheDocument()
