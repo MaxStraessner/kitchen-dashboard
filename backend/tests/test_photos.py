@@ -46,7 +46,7 @@ async def upload(
     token: str,
     data: bytes,
     name: str = "iphone.JPG",
-    content_type: str = "application/octet-stream",
+    content_type: str | None = "application/octet-stream",
 ):
     return await client.post(
         "/api/v1/photos",
@@ -107,7 +107,7 @@ async def test_photo_upload_processes_metadata_lists_serves_and_deletes(
 
 
 async def test_photo_upload_requires_auth_and_rejects_invalid_or_large_files(
-    client: AsyncClient, tmp_path: Path
+    client: AsyncClient, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     settings = photo_settings(tmp_path, maximum_bytes=1024)
     app.dependency_overrides[get_settings] = lambda: settings
@@ -119,13 +119,97 @@ async def test_photo_upload_requires_auth_and_rejects_invalid_or_large_files(
     await setup(client)
     token = await csrf(client)
     invalid = await upload(client, token, b"this is not an image", "fake.jpg")
-    assert invalid.status_code == 415
-    assert "gültiges" in invalid.json()["detail"]
+    assert invalid.status_code == 400
+    assert (
+        invalid.json()["detail"]
+        == "Die ausgewählte Datei konnte nicht als gültiges Bild gelesen werden."
+    )
+    assert "photo_upload_failed" in caplog.text
+    assert "exception_class=UnidentifiedImageError" in caplog.text
+
+    damaged = await upload(client, token, jpeg_photo()[:10], "damaged.jpeg", "image/jpeg")
+    assert damaged.status_code == 400
+    assert (
+        damaged.json()["detail"]
+        == "Die ausgewählte Datei konnte nicht als gültiges Bild gelesen werden."
+    )
 
     too_large = await upload(client, token, b"x" * 1025, "large.jpg")
     assert too_large.status_code == 413
     assert "zu groß" in too_large.json()["detail"]
     assert not (tmp_path / "photos").exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "content_type"),
+    [
+        ("IMG_7457.jpg", "image/jpeg"),
+        ("IMG_7457.jpeg", "image/jpeg"),
+        ("IMG_7457.JPG", "image/jpeg"),
+        ("IMG_7457.JPEG", "image/jpeg"),
+        ("IMG_7457.jpeg", ""),
+        ("IMG_7457.jpeg", "text/plain"),
+    ],
+    ids=["jpg", "jpeg", "JPG", "JPEG", "empty-mime", "incorrect-mime"],
+)
+async def test_valid_jpeg_is_accepted_from_its_decoded_contents(
+    client: AsyncClient, tmp_path: Path, name: str, content_type: str
+) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    data = jpeg_photo((1536, 2048))
+
+    assert data[:3] == b"\xff\xd8\xff"
+    response = await upload(client, await csrf(client), data, name, content_type)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["originalMimeType"] == "image/jpeg"
+
+
+async def test_photo_upload_accepts_valid_origin_and_csrf_token(
+    client: AsyncClient, tmp_path: Path
+) -> None:
+    settings = Settings(
+        app_env="test",
+        media_root=tmp_path,
+        photo_max_upload_bytes=2 * 1024 * 1024,
+        photo_max_dimension=640,
+        photo_thumbnail_max_dimension=160,
+        photo_webp_quality=88,
+        auth_allowed_origins="http://dashboard.test/",
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+
+    response = await client.post(
+        "/api/v1/photos",
+        headers={
+            "X-CSRF-Token": await csrf(client),
+            "Origin": "http://dashboard.test/",
+        },
+        files={"file": ("IMG_7457.jpeg", jpeg_photo((1536, 2048)), "image/jpeg")},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["originalMimeType"] == "image/jpeg"
+
+
+async def test_photo_upload_rejects_unsupported_decoded_image_format(
+    client: AsyncClient, tmp_path: Path
+) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    output = BytesIO()
+    Image.new("RGB", (80, 50), (22, 143, 91)).save(output, format="GIF")
+
+    response = await upload(
+        client, await csrf(client), output.getvalue(), "iphone-photo", "application/octet-stream"
+    )
+
+    assert response.status_code == 415
+    assert "Bildformat" in response.json()["detail"]
 
 
 @pytest.mark.parametrize(
@@ -135,6 +219,7 @@ async def test_photo_upload_requires_auth_and_rejects_invalid_or_large_files(
         ("family.png", "image/png", None, "image/png"),
         ("family.webp", "image/webp", None, "image/webp"),
     ],
+    ids=["jpeg", "png", "webp"],
 )
 async def test_supported_photo_formats_are_converted_to_browser_compatible_webp(
     client: AsyncClient,
@@ -171,19 +256,18 @@ async def test_supported_photo_formats_are_converted_to_browser_compatible_webp(
         assert converted.format == "WEBP"
 
 
-async def test_photo_upload_rejects_unsupported_filename_and_mime_type(
+async def test_photo_upload_uses_decoded_contents_instead_of_client_metadata(
     client: AsyncClient, tmp_path: Path
 ) -> None:
     settings = photo_settings(tmp_path)
     app.dependency_overrides[get_settings] = lambda: settings
     await setup(client)
     token = await csrf(client)
-    unsupported_extension = await upload(client, token, jpeg_photo(), "family.gif")
-    unsupported_mime = await upload(
-        client, token, jpeg_photo(), "family.jpg", "text/plain; charset=binary"
+    response = await upload(
+        client, token, jpeg_photo(), "IMG_0042.unknown", "text/plain; charset=binary"
     )
-    assert unsupported_extension.status_code == 415
-    assert unsupported_mime.status_code == 415
+    assert response.status_code == 201, response.text
+    assert response.json()["originalMimeType"] == "image/jpeg"
 
 
 @pytest.mark.parametrize(
@@ -206,6 +290,25 @@ async def test_heic_upload_is_converted_to_browser_compatible_webp(
     with Image.open(BytesIO(image.content)) as converted:
         assert converted.format == "WEBP"
         assert converted.size == (320, 180)
+
+
+async def test_heic_upload_accepts_generic_iphone_metadata(
+    client: AsyncClient, tmp_path: Path
+) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+
+    response = await upload(
+        client,
+        await csrf(client),
+        heif_photo(),
+        "IMG_0042.unknown",
+        "application/octet-stream",
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["originalMimeType"] in {"image/heic", "image/heif"}
 
 
 async def test_members_see_and_delete_only_own_photos_while_admins_can_manage_all(

@@ -7,7 +7,8 @@ import { useAuth } from '../auth/AuthProvider'
 import { usePhotos } from '../hooks/usePhotos'
 import type { Photo } from '../types/api'
 
-const ACCEPTED_PHOTOS = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif'
+const ACCEPTED_PHOTOS =
+  'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.jpe,.png,.webp,.heic,.heif'
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`

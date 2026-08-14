@@ -2,6 +2,7 @@ import asyncio
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
 from fastapi import HTTPException, Request, Response
 from httpx import AsyncClient
 from sqlalchemy import func, select
@@ -205,6 +206,54 @@ async def test_protected_endpoints_health_and_csrf(client: AsyncClient) -> None:
         "/api/v1/account", json={"displayName": "Neu"}, headers={"X-CSRF-Token": token}
     )
     assert valid.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "origin",
+    ["http://dashboard-one.test", "http://dashboard-two.test/"],
+)
+async def test_csrf_accepts_each_explicit_origin_and_normalizes_trailing_slashes(
+    client: AsyncClient, origin: str
+) -> None:
+    settings = Settings(
+        app_env="test",
+        auth_allowed_origins=" http://dashboard-one.test/, http://dashboard-two.test/// ",
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+
+    response = await client.patch(
+        "/api/v1/account",
+        json={"displayName": "Erlaubter Origin"},
+        headers={"X-CSRF-Token": await csrf(client), "Origin": origin},
+    )
+
+    assert response.status_code == 200, response.text
+
+
+async def test_logout_accepts_valid_origin_and_csrf_token(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    settings = Settings(
+        app_env="test",
+        auth_allowed_origins="http://dashboard.test/",
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    auth_session = (await session.scalars(select(AuthSession))).one()
+
+    response = await client.post(
+        "/api/v1/auth/logout",
+        headers={
+            "X-CSRF-Token": await csrf(client),
+            "Origin": "http://dashboard.test/",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    await session.refresh(auth_session)
+    assert auth_session.revoked_at is not None
+    assert (await client.get("/api/v1/auth/me")).status_code == 401
 
 
 async def test_admin_member_password_and_last_admin_rules(
