@@ -41,6 +41,20 @@ def heif_photo() -> bytes:
     return output.getvalue()
 
 
+def mpo_photo() -> bytes:
+    output = BytesIO()
+    primary = Image.new("RGB", (640, 480), (49, 111, 173))
+    secondary = Image.new("RGB", (640, 480), (173, 91, 49))
+    primary.save(
+        output,
+        format="MPO",
+        save_all=True,
+        append_images=[secondary],
+        quality=95,
+    )
+    return output.getvalue()
+
+
 async def upload(
     client: AsyncClient,
     token: str,
@@ -193,6 +207,31 @@ async def test_photo_upload_accepts_valid_origin_and_csrf_token(
 
     assert response.status_code == 201, response.text
     assert response.json()["originalMimeType"] == "image/jpeg"
+
+
+async def test_mpo_encoded_jpeg_is_accepted_as_jpeg(client: AsyncClient, tmp_path: Path) -> None:
+    settings = photo_settings(tmp_path)
+    app.dependency_overrides[get_settings] = lambda: settings
+    await setup(client)
+    data = mpo_photo()
+
+    with Image.open(BytesIO(data)) as decoded:
+        assert data[:3] == b"\xff\xd8\xff"
+        assert decoded.format == "MPO"
+        assert decoded.n_frames == 2
+
+    response = await upload(
+        client,
+        await csrf(client),
+        data,
+        "IMG_7457.jpeg",
+        "image/jpeg",
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["originalMimeType"] == "image/jpeg"
+    assert response.json()["mimeType"] == "image/webp"
+    assert (response.json()["width"], response.json()["height"]) == (640, 480)
 
 
 async def test_photo_upload_rejects_unsupported_decoded_image_format(

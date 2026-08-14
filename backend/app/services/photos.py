@@ -19,6 +19,7 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 SUPPORTED_IMAGE_FORMATS = {
     "JPEG": "image/jpeg",
+    "MPO": "image/jpeg",
     "PNG": "image/png",
     "WEBP": "image/webp",
     "HEIF": "image/heif",
