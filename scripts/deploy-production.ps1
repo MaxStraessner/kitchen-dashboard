@@ -82,7 +82,7 @@ github_commit="$(git rev-parse "origin/$main_branch")"
 [ "$deployed_commit" = "$github_commit" ] || fail "VPS main ($deployed_commit) differs from origin/main ($github_commit); refusing to deploy an unmerged or divergent commit"
 
 compose=(docker compose --env-file "$environment_file" -f "$compose_file")
-"${compose[@]}" config --quiet
+"${compose[@]}" config --quiet </dev/null
 
 if [ "$previous_commit" != "$deployed_commit" ]; then
   backup_directory="$project_directory/backups"
@@ -92,31 +92,31 @@ if [ "$previous_commit" != "$deployed_commit" ]; then
   umask 077
 
   printf 'Creating PostgreSQL backup: %s\n' "$backup_file"
-  "${compose[@]}" exec -T kitchen-dashboard-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip -c > "$backup_file"
+  "${compose[@]}" exec -T kitchen-dashboard-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' </dev/null | gzip -c > "$backup_file"
   test -s "$backup_file" || fail "database backup is empty: $backup_file"
 
-  if "${compose[@]}" exec -T kitchen-dashboard-api python -c 'from pathlib import Path; raise SystemExit(0 if Path("/data/media").is_dir() else 1)'; then
+  if "${compose[@]}" exec -T kitchen-dashboard-api python -c 'from pathlib import Path; raise SystemExit(0 if Path("/data/media").is_dir() else 1)' </dev/null; then
     printf 'Creating media backup: %s\n' "$media_backup_file"
-    "${compose[@]}" exec -T kitchen-dashboard-api python -c 'import sys, tarfile; archive = tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz"); archive.add("/data/media", arcname="."); archive.close()' > "$media_backup_file"
+    "${compose[@]}" exec -T kitchen-dashboard-api python -c 'import sys, tarfile; archive = tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz"); archive.add("/data/media", arcname="."); archive.close()' </dev/null > "$media_backup_file"
     test -s "$media_backup_file" || fail "media backup is empty: $media_backup_file"
   else
     printf 'No existing media mount found; skipping the initial media backup.\n'
   fi
 
-  "${compose[@]}" build kitchen-dashboard-api kitchen-dashboard-web
+  "${compose[@]}" build kitchen-dashboard-api kitchen-dashboard-web </dev/null
 else
   printf 'Git commit already deployed; skipping backup and image build.\n'
 fi
 
 # Always reconcile Compose so a protected environment change (for example a
 # rotated camera credential) is applied without requiring an unrelated Git commit.
-"${compose[@]}" up -d
+"${compose[@]}" up -d </dev/null
 
 wait_for_healthy_service() {
   service="$1"
   attempt=1
   while [ "$attempt" -le 30 ]; do
-    container_id="$("${compose[@]}" ps -q "$service")"
+    container_id="$("${compose[@]}" ps -q "$service" </dev/null)"
     if [ -n "$container_id" ]; then
       health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
       if [ "$health" = "healthy" ]; then
@@ -135,14 +135,14 @@ for service in kitchen-dashboard-postgres kitchen-dashboard-api kitchen-dashboar
   wait_for_healthy_service "$service"
 done
 
-web_health="$("${compose[@]}" exec -T kitchen-dashboard-web wget -q -O - http://127.0.0.1:8080/healthz)"
+web_health="$("${compose[@]}" exec -T kitchen-dashboard-web wget -q -O - http://127.0.0.1:8080/healthz </dev/null)"
 [ "$web_health" = "healthy" ] || fail "frontend health endpoint returned an unexpected response"
 
-api_health="$("${compose[@]}" exec -T kitchen-dashboard-web wget -q -O - http://127.0.0.1:8080/api/v1/health)"
+api_health="$("${compose[@]}" exec -T kitchen-dashboard-web wget -q -O - http://127.0.0.1:8080/api/v1/health </dev/null)"
 printf '%s' "$api_health" | grep -q '"status":"healthy"' || fail "API health endpoint did not report healthy"
 printf '%s' "$api_health" | grep -q '"database":{"status":"healthy"}' || fail "database component did not report healthy"
 
-"${compose[@]}" ps
+"${compose[@]}" ps </dev/null
 printf 'VPS deployed: %s\n' "$deployed_commit"
 '@
 $remoteScript = $remoteScript -replace "`r`n", "`n"
