@@ -77,7 +77,7 @@ Copy-Item .env.example .env
 docker compose -f deploy/compose.yaml up --build
 ```
 
-Open `http://localhost:8080`. PostgreSQL has no published host port. Stop with:
+Open `http://localhost:8081`. PostgreSQL has no published host port. Stop with:
 
 ```powershell
 docker compose -f deploy/compose.yaml down
