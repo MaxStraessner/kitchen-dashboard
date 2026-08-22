@@ -262,7 +262,9 @@ test('camera stream reconnects automatically after playback fails', async () => 
   expect(firstVideo).toHaveAttribute('src', '/camera-stream/api/stream.mp4?src=tapo')
   fireEvent.error(firstVideo)
   expect(await screen.findByText('Kamera momentan nicht erreichbar')).toBeVisible()
-  await waitFor(() => expect(camera.querySelector('video')).not.toBe(firstVideo), { timeout: 2_000 })
+  await waitFor(() => expect(camera.querySelector('video')).not.toBe(firstVideo), {
+    timeout: 2_000,
+  })
   const secondVideo = camera.querySelector('video') as HTMLVideoElement
   expect(await screen.findByText('Kamera wird verbunden')).toBeVisible()
   fireEvent.playing(secondVideo)
