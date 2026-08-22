@@ -1,4 +1,4 @@
-modules: [api, streams, rtsp, webrtc]
+modules: [api, streams, rtsp, mp4]
 
 streams:
   tapo:
@@ -8,18 +8,10 @@ streams:
 # browser's same-origin /camera-stream request to it.
 api:
   listen: ":1984"
-  allow_paths: [/api, /api/webrtc]
+  allow_paths: [/api, /api/stream.mp4]
 
 rtsp:
   listen: ""
-
-# The dashboard already uses localhost:8080 over TCP. Docker can safely map the
-# same port number for UDP, which lets the local browser receive WebRTC media
-# without publishing another port.
-webrtc:
-  listen: ":8080"
-  candidates: ["127.0.0.1:${CAMERA_WEBRTC_HOST_PORT}"]
-  ice_servers: []
 
 # Source failures may include an RTSP URL, so never write camera credentials to logs.
 log:

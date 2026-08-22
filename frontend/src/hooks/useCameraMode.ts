@@ -15,7 +15,7 @@ interface CameraModeState extends CameraModeStatus {
 const initialStatus: CameraModeStatus = {
   active: false,
   expiresAt: null,
-  streamUrl: '/camera-stream/api/webrtc?src=tapo',
+  streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
   revision: 0,
 }
 

@@ -2,8 +2,7 @@
 param(
     [string]$SshTarget = "root@152.239.117.234",
     [string]$IdentityFile,
-    [string]$ProjectDirectory = "/docker/kitchen-dashboard",
-    [string]$TailscaleAddress = "100.81.227.118"
+    [string]$ProjectDirectory = "/docker/kitchen-dashboard"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,15 +20,10 @@ if ($SshTarget -notmatch "^[A-Za-z0-9._@:-]+$") {
 if ($ProjectDirectory -notmatch "^/[A-Za-z0-9._/-]+$") {
     throw "ProjectDirectory contains unsupported characters."
 }
-if ($TailscaleAddress -notmatch "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$") {
-    throw "TailscaleAddress must be an IPv4 address."
-}
-
 $remoteScript = @'
 set -euo pipefail
 
 project_directory="$1"
-tailscale_address="$2"
 environment_file="$project_directory/.env"
 
 [ "$(id -u)" = "0" ] || { printf 'Run this command through the configured root SSH target.\n' >&2; exit 1; }
@@ -53,7 +47,6 @@ import tempfile
 import urllib.parse
 
 environment_path = pathlib.Path(sys.argv[1])
-tailscale_address = sys.argv[2]
 parts = sys.stdin.buffer.read().split(b"\0")
 if len(parts) != 3 or parts[-1] != b"":
     raise SystemExit("Invalid protected input")
@@ -61,8 +54,7 @@ username = urllib.parse.quote(parts[0].decode(), safe="")
 password = urllib.parse.quote(parts[1].decode(), safe="")
 updates = {
     "CAMERA_MODE_TIMEOUT_MINUTES": "15",
-    "CAMERA_STREAM_URL": "/camera-stream/api/webrtc?src=tapo",
-    "CAMERA_WEBRTC_BIND_IP": tailscale_address,
+    "CAMERA_STREAM_URL": "/camera-stream/api/stream.mp4?src=tapo",
     "TAPO_CAMERA_STREAM": f"rtsp://{username}:{password}@192.168.178.72:554/stream1",
 }
 lines = environment_path.read_text(encoding="utf-8").splitlines()
@@ -89,7 +81,7 @@ try:
 finally:
     if os.path.exists(temporary_name):
         os.unlink(temporary_name)
-' "$environment_file" "$tailscale_address"
+' "$environment_file"
 
 unset camera_username camera_password
 chmod 600 "$environment_file"
@@ -99,7 +91,7 @@ $remoteScript = $remoteScript -replace "`r`n", "`n"
 $encodedRemoteScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
 
 & ssh -tt -i $IdentityFile -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes `
-    $SshTarget "echo $encodedRemoteScript | base64 -d | bash -s -- '$ProjectDirectory' '$TailscaleAddress'"
+    $SshTarget "echo $encodedRemoteScript | base64 -d | bash -s -- '$ProjectDirectory'"
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     bring_idle_sync_seconds: int = Field(default=600, ge=600, le=3600)
     camera_mode_timeout_minutes: int = Field(default=15, ge=1, le=120)
     camera_stream_url: str = Field(
-        default="/camera-stream/api/webrtc?src=tapo",
+        default="/camera-stream/api/stream.mp4?src=tapo",
         max_length=240,
         pattern=r"^/camera-stream/[A-Za-z0-9._~/?=&%+-]+$",
     )

@@ -10,29 +10,6 @@ interface CameraStreamCardProps {
 
 type StreamState = 'connecting' | 'live' | 'error'
 
-function waitForIceGathering(connection: RTCPeerConnection, signal: AbortSignal): Promise<void> {
-  if (connection.iceGatheringState === 'complete') return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(done, 5_000)
-    function done() {
-      window.clearTimeout(timeout)
-      connection.removeEventListener('icegatheringstatechange', changed)
-      signal.removeEventListener('abort', aborted)
-      resolve()
-    }
-    function changed() {
-      if (connection.iceGatheringState === 'complete') done()
-    }
-    function aborted() {
-      window.clearTimeout(timeout)
-      connection.removeEventListener('icegatheringstatechange', changed)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }
-    connection.addEventListener('icegatheringstatechange', changed)
-    signal.addEventListener('abort', aborted, { once: true })
-  })
-}
-
 export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const retryDelayRef = useRef(1_000)
@@ -41,95 +18,75 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
 
   useEffect(() => {
     const video = videoRef.current
-    const controller = new AbortController()
-    let connection: RTCPeerConnection | null = null
-    let trackTimeout: number | undefined
-    let disconnectTimeout: number | undefined
+    let stalledTimeout: number | undefined
     let retryTimeout: number | undefined
     let failed = false
 
     function fail() {
-      if (controller.signal.aborted || failed) return
+      if (failed) return
       failed = true
+      window.clearTimeout(connectTimeout)
+      window.clearTimeout(stalledTimeout)
       setState('error')
-      connection?.close()
       retryTimeout = window.setTimeout(() => {
         retryDelayRef.current = Math.min(retryDelayRef.current * 2, 30_000)
         setAttempt((current) => current + 1)
       }, retryDelayRef.current)
     }
 
-    async function connect() {
-      setState('connecting')
-      if (!video || typeof RTCPeerConnection === 'undefined') {
-        fail()
-        return
-      }
-      try {
-        connection = new RTCPeerConnection({ iceServers: [] })
-        connection.addTransceiver('video', { direction: 'recvonly' })
-        connection.ontrack = (event) => {
-          window.clearTimeout(trackTimeout)
-          window.clearTimeout(disconnectTimeout)
-          video.srcObject = event.streams[0] ?? new MediaStream([event.track])
-          retryDelayRef.current = 1_000
-          setState('live')
-        }
-        connection.onconnectionstatechange = () => {
-          if (connection?.connectionState === 'failed') fail()
-          if (connection?.connectionState === 'disconnected') {
-            window.clearTimeout(disconnectTimeout)
-            disconnectTimeout = window.setTimeout(fail, 3_000)
-          }
-          if (connection?.connectionState === 'connected') {
-            window.clearTimeout(disconnectTimeout)
-          }
-        }
-        const offer = await connection.createOffer()
-        await connection.setLocalDescription(offer)
-        await waitForIceGathering(connection, controller.signal)
-        const response = await fetch(streamUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: connection.localDescription?.sdp ?? offer.sdp,
-          cache: 'no-store',
-          signal: controller.signal,
-        })
-        if (!response.ok) throw new Error('WHEP signaling failed')
-        const answer = await response.text()
-        trackTimeout = window.setTimeout(fail, 10_000)
-        await connection.setRemoteDescription({ type: 'answer', sdp: answer })
-      } catch (reason) {
-        if (!(reason instanceof DOMException && reason.name === 'AbortError')) fail()
-      }
+    function playing() {
+      failed = false
+      window.clearTimeout(connectTimeout)
+      window.clearTimeout(stalledTimeout)
+      window.clearTimeout(retryTimeout)
+      retryDelayRef.current = 1_000
+      setState('live')
     }
 
-    void connect()
+    function waiting() {
+      window.clearTimeout(stalledTimeout)
+      stalledTimeout = window.setTimeout(fail, 5_000)
+    }
+
+    function progressing() {
+      window.clearTimeout(stalledTimeout)
+    }
+
+    const connectTimeout = window.setTimeout(fail, 15_000)
+    setState('connecting')
+    if (!video) {
+      fail()
+      return () => window.clearTimeout(retryTimeout)
+    }
+
+    video.addEventListener('playing', playing)
+    video.addEventListener('error', fail)
+    video.addEventListener('stalled', waiting)
+    video.addEventListener('waiting', waiting)
+    video.addEventListener('progress', progressing)
     return () => {
-      controller.abort()
-      window.clearTimeout(trackTimeout)
-      window.clearTimeout(disconnectTimeout)
+      window.clearTimeout(connectTimeout)
+      window.clearTimeout(stalledTimeout)
       window.clearTimeout(retryTimeout)
-      if (typeof MediaStream !== 'undefined' && video?.srcObject instanceof MediaStream) {
-        for (const track of video.srcObject.getTracks()) track.stop()
-      }
-      if (video) video.srcObject = null
-      if (connection) {
-        connection.ontrack = null
-        connection.onconnectionstatechange = null
-        connection.close()
-      }
+      video.removeEventListener('playing', playing)
+      video.removeEventListener('error', fail)
+      video.removeEventListener('stalled', waiting)
+      video.removeEventListener('waiting', waiting)
+      video.removeEventListener('progress', progressing)
     }
   }, [attempt, streamUrl])
 
   return (
     <Card className="camera-card" aria-label="Tapo Live Stream">
       <video
+        key={attempt}
         ref={videoRef}
         className={`camera-video ${state === 'live' ? 'is-visible' : ''}`}
+        src={streamUrl}
         autoPlay
         muted
         playsInline
+        preload="auto"
       />
       <div className="camera-card-scrim" aria-hidden="true" />
       <header className="camera-card-header">

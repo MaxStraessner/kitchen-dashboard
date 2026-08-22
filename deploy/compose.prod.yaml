@@ -19,18 +19,14 @@ services:
       timeout: 4s
       retries: 5
 
-  # WHEP stays inside the project network. WebRTC media reuses the dashboard's
-  # existing port number over UDP and binds it only to the VPS Tailscale address.
+  # The MP4 camera stream stays behind the authenticated dashboard proxy and
+  # reuses the existing dashboard HTTP listener. No camera port is published.
   kitchen-dashboard-camera:
     image: alexxit/go2rtc:1.9.14@sha256:675c318b23c06fd862a61d262240c9a63436b4050d177ffc68a32710d9e05bae
     environment:
       TAPO_CAMERA_STREAM: ${TAPO_CAMERA_STREAM:?Set TAPO_CAMERA_STREAM in the protected production environment}
-      CAMERA_WEBRTC_HOST: ${CAMERA_WEBRTC_BIND_IP:?Set CAMERA_WEBRTC_BIND_IP to the VPS Tailscale address}
-      CAMERA_WEBRTC_HOST_PORT: ${APP_HTTP_PORT:-8080}
     volumes:
       - ./go2rtc.prod.yaml:/config/go2rtc.yaml:ro
-    ports:
-      - "${CAMERA_WEBRTC_BIND_IP:?Set CAMERA_WEBRTC_BIND_IP to the VPS Tailscale address}:${APP_HTTP_PORT:-8080}:8080/udp"
     restart: unless-stopped
     networks: [kitchen-dashboard-app]
     read_only: true
@@ -71,7 +67,7 @@ services:
       BRING_PASSWORD: ${BRING_PASSWORD:-}
       BRING_LIST_UUID: ${BRING_LIST_UUID:-}
       CAMERA_MODE_TIMEOUT_MINUTES: ${CAMERA_MODE_TIMEOUT_MINUTES:-15}
-      CAMERA_STREAM_URL: ${CAMERA_STREAM_URL:-/camera-stream/api/webrtc?src=tapo}
+      CAMERA_STREAM_URL: ${CAMERA_STREAM_URL:-/camera-stream/api/stream.mp4?src=tapo}
       MEDIA_ROOT: /data/media
       PHOTO_MAX_UPLOAD_BYTES: ${PHOTO_MAX_UPLOAD_BYTES:-20971520}
       PHOTO_MAX_DIMENSION: ${PHOTO_MAX_DIMENSION:-2560}
