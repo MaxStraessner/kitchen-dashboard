@@ -19,7 +19,7 @@ This is the operational source of truth for Kitchen Dashboard. It uses the exist
 | Docker networks | `kitchen-dashboard_kitchen-dashboard-app`, `kitchen-dashboard_kitchen-dashboard-data` |
 | Current internal HTTP endpoint | `http://127.0.0.1:18080` on the VPS |
 | Direct production URL | `http://152.239.117.234:18080` |
-| Camera media | VPS Tailscale IPv4 on UDP `18080` only |
+| Camera media | authenticated MP4 through the existing dashboard TCP `18080` listener |
 
 The frontend, API, and PostgreSQL containers belong only to this Compose project. PostgreSQL is not published on a host port. The VPS also hosts independent `n8n`, `nuamkasse-ip`, and `telefonagent` projects; never restart, rebuild, or alter them while deploying Kitchen Dashboard.
 
@@ -63,12 +63,11 @@ The command emits the required `LOCAL`, `GITHUB`, and `VPS` branch/commit fields
 
 ## Tapo camera stream
 
-The camera bridge is an isolated service inside this Kitchen Dashboard Compose project. Its API is
-not published; authenticated same-origin WHEP requests pass through the frontend. The only media
-binding is UDP on the VPS Tailscale IPv4 and the already-used dashboard port number `18080`. The
-Raspberry Pi remains the narrow `/32` subnet router and kiosk browser; it does not run a second
-camera bridge. Protected variables and acceptance checks are documented in
-[docs/tapo-camera-mode.md](docs/tapo-camera-mode.md).
+The camera bridge is an isolated service inside this Kitchen Dashboard Compose project. Its API and
+camera ports are not published; authenticated same-origin MP4 requests pass through the existing
+frontend TCP listener on port `18080`. The Raspberry Pi remains the narrow `/32` subnet router and
+kiosk browser; it does not run a second camera bridge. Protected variables and acceptance checks are
+documented in [docs/tapo-camera-mode.md](docs/tapo-camera-mode.md).
 
 ## Git workflow
 
