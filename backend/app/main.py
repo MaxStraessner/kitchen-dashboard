@@ -1,5 +1,6 @@
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,15 +9,22 @@ from starlette.responses import Response
 from app.api.v1.router import router
 from app.core.config import get_settings
 from app.services.bring import get_bring_service
+from app.services.camera_mode import get_camera_mode_service
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    camera_service = get_camera_mode_service()
+    await camera_service.reset_on_startup()
+    camera_timeout_task = asyncio.create_task(camera_service.monitor_timeout())
     try:
         yield
     finally:
+        camera_timeout_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await camera_timeout_task
         await get_bring_service().close()
 
 

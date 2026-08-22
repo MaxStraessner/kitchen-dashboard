@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     bring_request_timeout_seconds: float = Field(default=15, ge=3, le=60)
     bring_active_sync_seconds: int = Field(default=90, ge=90, le=900)
     bring_idle_sync_seconds: int = Field(default=600, ge=600, le=3600)
+    camera_mode_timeout_minutes: int = Field(default=15, ge=1, le=120)
+    camera_stream_url: str = Field(
+        default="/camera-stream/api/webrtc?src=tapo",
+        max_length=240,
+        pattern=r"^/camera-stream/[A-Za-z0-9._~/?=&%+-]+$",
+    )
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     auth_cookie_secure: bool = False
     auth_session_ttl_hours: int = Field(default=24, ge=1, le=168)

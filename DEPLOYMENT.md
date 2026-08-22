@@ -60,6 +60,13 @@ Use this non-mutating preflight when needed:
 
 The command emits the required `LOCAL`, `GITHUB`, and `VPS` branch/commit fields. It prints `STATUS: SYNCHRON` only when all three are on `main` at the same commit; otherwise it exits with code `1` and prints `STATUS: NOT SYNCHRON`.
 
+## Optional Raspberry Pi camera mode
+
+The Tapo stream bridge is deliberately not part of the VPS Compose project. Its isolated,
+loopback-only Raspberry Pi setup, environment variables, ports and acceptance checks are documented
+in [docs/tapo-camera-mode.md](docs/tapo-camera-mode.md). Deploying `main` to the VPS does not install
+or restart the Pi services.
+
 ## Git workflow
 
 Start a feature only from a clean checkout:

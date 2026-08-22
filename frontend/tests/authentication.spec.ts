@@ -38,6 +38,7 @@ test('fresh household setup and complete administrator/member lifecycle', async 
   await expect(page.getByRole('heading', { name: 'Jessica' })).toBeVisible()
 
   await page.goto('/settings')
+  await expect(page.getByText('Kamera nicht aktiv')).toBeVisible()
   await page.screenshot({ path: 'tests/artifacts/settings-smartphone.png', fullPage: true })
   await page.getByRole('button', { name: /Abmelden/ }).click()
   await expect(page).toHaveURL(/\/login$/)
