@@ -82,6 +82,7 @@ github_commit="$(git rev-parse "origin/$main_branch")"
 [ "$deployed_commit" = "$github_commit" ] || fail "VPS main ($deployed_commit) differs from origin/main ($github_commit); refusing to deploy an unmerged or divergent commit"
 
 compose=(docker compose --env-file "$environment_file" -f "$compose_file")
+"${compose[@]}" config --quiet
 
 if [ "$previous_commit" != "$deployed_commit" ]; then
   backup_directory="$project_directory/backups"
@@ -103,10 +104,13 @@ if [ "$previous_commit" != "$deployed_commit" ]; then
   fi
 
   "${compose[@]}" build kitchen-dashboard-api kitchen-dashboard-web
-  "${compose[@]}" up -d
 else
   printf 'Git commit already deployed; skipping backup and image build.\n'
 fi
+
+# Always reconcile Compose so a protected environment change (for example a
+# rotated camera credential) is applied without requiring an unrelated Git commit.
+"${compose[@]}" up -d
 
 wait_for_healthy_service() {
   service="$1"
@@ -127,7 +131,7 @@ wait_for_healthy_service() {
   fail "service did not become healthy: $service ($health)"
 }
 
-for service in kitchen-dashboard-postgres kitchen-dashboard-api kitchen-dashboard-web; do
+for service in kitchen-dashboard-postgres kitchen-dashboard-api kitchen-dashboard-camera kitchen-dashboard-web; do
   wait_for_healthy_service "$service"
 done
 

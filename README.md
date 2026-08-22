@@ -20,10 +20,11 @@ Implemented now:
 - Bidirectional shared Bring shopping list with safe server-side credentials
 - React component tests, FastAPI tests, and Playwright kiosk checks
 - Development and production-oriented Docker Compose definitions
+- Authenticated Tapo live camera mode through an internal RTSP-to-WebRTC bridge
 
 Also implemented: one-time household setup, username/password accounts, administrator and member roles, Argon2id password hashing, server-side sessions, CSRF protection, personal account settings, and administrator user management.
 
-Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a separate mobile app, WebSockets, devices, Home Assistant, cameras, N8N, reverse proxy, or domain configuration.
+Not implemented: public registration, email login or recovery, OAuth, passkeys, two-factor authentication, a separate mobile app, WebSockets, devices, Home Assistant, N8N, reverse proxy, or domain configuration.
 
 ## Architecture
 
@@ -132,6 +133,10 @@ PostgreSQL stores photo metadata and ownership only. Files live in the named Doc
 | `BRING_EMAIL` | Bring account email; protected host secret, never commit it |
 | `BRING_PASSWORD` | Bring account password; protected host secret, never commit it |
 | `BRING_LIST_UUID` | UUID of the shared list; keep it in host configuration |
+| `CAMERA_MODE_TIMEOUT_MINUTES` | Shared camera mode timeout, default `15` |
+| `CAMERA_STREAM_URL` | Credential-free same-origin WHEP path |
+| `TAPO_CAMERA_STREAM` | Protected RTSP source URL; never commit or print it |
+| `CAMERA_WEBRTC_BIND_IP` | Production-only VPS Tailscale IPv4 media binding |
 | `PHOTO_MAX_UPLOAD_BYTES` | Original upload limit, default `20971520` (20 MB) |
 | `PHOTO_MAX_DIMENSION` | Maximum long edge for dashboard images, default `2560` |
 | `PHOTO_THUMBNAIL_MAX_DIMENSION` | Maximum long edge for previews, default `480` |

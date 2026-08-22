@@ -19,6 +19,7 @@ This is the operational source of truth for Kitchen Dashboard. It uses the exist
 | Docker networks | `kitchen-dashboard_kitchen-dashboard-app`, `kitchen-dashboard_kitchen-dashboard-data` |
 | Current internal HTTP endpoint | `http://127.0.0.1:18080` on the VPS |
 | Direct production URL | `http://152.239.117.234:18080` |
+| Camera media | VPS Tailscale IPv4 on UDP `18080` only |
 
 The frontend, API, and PostgreSQL containers belong only to this Compose project. PostgreSQL is not published on a host port. The VPS also hosts independent `n8n`, `nuamkasse-ip`, and `telefonagent` projects; never restart, rebuild, or alter them while deploying Kitchen Dashboard.
 
@@ -44,7 +45,7 @@ When a new Git commit must be deployed, the script creates a timestamped Postgre
 
 The first photo-enabled deployment creates the named media volume without deleting or replacing existing volumes. Every later changed deployment backs up `/data/media` before rebuilding. Include both `predeploy-*.sql.gz` and `media-predeploy-*.tar.gz` in the host backup retention policy.
 
-It verifies the protected environment has mode `0600`, waits up to two minutes for all three containers to become healthy, then verifies `/healthz`, the proxied `/api/v1/health`, and the database component. On success it prints the exact deployed commit. A nonzero exit code means no successful deployment claim was made.
+It verifies the protected environment has mode `0600`, validates Compose without printing resolved values, waits up to two minutes for all four containers to become healthy, then verifies `/healthz`, the proxied `/api/v1/health`, and the database component. On success it prints the exact deployed commit. A nonzero exit code means no successful deployment claim was made.
 
 Use this non-mutating preflight when needed:
 
@@ -60,12 +61,14 @@ Use this non-mutating preflight when needed:
 
 The command emits the required `LOCAL`, `GITHUB`, and `VPS` branch/commit fields. It prints `STATUS: SYNCHRON` only when all three are on `main` at the same commit; otherwise it exits with code `1` and prints `STATUS: NOT SYNCHRON`.
 
-## Optional Raspberry Pi camera mode
+## Tapo camera stream
 
-The Tapo stream bridge is deliberately not part of the VPS Compose project. Its isolated,
-loopback-only Raspberry Pi setup, environment variables, ports and acceptance checks are documented
-in [docs/tapo-camera-mode.md](docs/tapo-camera-mode.md). Deploying `main` to the VPS does not install
-or restart the Pi services.
+The camera bridge is an isolated service inside this Kitchen Dashboard Compose project. Its API is
+not published; authenticated same-origin WHEP requests pass through the frontend. The only media
+binding is UDP on the VPS Tailscale IPv4 and the already-used dashboard port number `18080`. The
+Raspberry Pi remains the narrow `/32` subnet router and kiosk browser; it does not run a second
+camera bridge. Protected variables and acceptance checks are documented in
+[docs/tapo-camera-mode.md](docs/tapo-camera-mode.md).
 
 ## Git workflow
 

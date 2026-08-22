@@ -35,6 +35,7 @@ function waitForIceGathering(connection: RTCPeerConnection, signal: AbortSignal)
 
 export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const retryDelayRef = useRef(1_000)
   const [state, setState] = useState<StreamState>('connecting')
   const [attempt, setAttempt] = useState(0)
 
@@ -43,11 +44,25 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
     const controller = new AbortController()
     let connection: RTCPeerConnection | null = null
     let trackTimeout: number | undefined
+    let disconnectTimeout: number | undefined
+    let retryTimeout: number | undefined
+    let failed = false
+
+    function fail() {
+      if (controller.signal.aborted || failed) return
+      failed = true
+      setState('error')
+      connection?.close()
+      retryTimeout = window.setTimeout(() => {
+        retryDelayRef.current = Math.min(retryDelayRef.current * 2, 30_000)
+        setAttempt((current) => current + 1)
+      }, retryDelayRef.current)
+    }
 
     async function connect() {
       setState('connecting')
       if (!video || typeof RTCPeerConnection === 'undefined') {
-        setState('error')
+        fail()
         return
       }
       try {
@@ -55,13 +70,19 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
         connection.addTransceiver('video', { direction: 'recvonly' })
         connection.ontrack = (event) => {
           window.clearTimeout(trackTimeout)
+          window.clearTimeout(disconnectTimeout)
           video.srcObject = event.streams[0] ?? new MediaStream([event.track])
+          retryDelayRef.current = 1_000
           setState('live')
         }
         connection.onconnectionstatechange = () => {
-          if (connection?.connectionState === 'failed') {
-            setState('error')
-            connection.close()
+          if (connection?.connectionState === 'failed') fail()
+          if (connection?.connectionState === 'disconnected') {
+            window.clearTimeout(disconnectTimeout)
+            disconnectTimeout = window.setTimeout(fail, 3_000)
+          }
+          if (connection?.connectionState === 'connected') {
+            window.clearTimeout(disconnectTimeout)
           }
         }
         const offer = await connection.createOffer()
@@ -76,10 +97,10 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
         })
         if (!response.ok) throw new Error('WHEP signaling failed')
         const answer = await response.text()
-        trackTimeout = window.setTimeout(() => setState('error'), 10_000)
+        trackTimeout = window.setTimeout(fail, 10_000)
         await connection.setRemoteDescription({ type: 'answer', sdp: answer })
       } catch (reason) {
-        if (!(reason instanceof DOMException && reason.name === 'AbortError')) setState('error')
+        if (!(reason instanceof DOMException && reason.name === 'AbortError')) fail()
       }
     }
 
@@ -87,6 +108,8 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
     return () => {
       controller.abort()
       window.clearTimeout(trackTimeout)
+      window.clearTimeout(disconnectTimeout)
+      window.clearTimeout(retryTimeout)
       if (typeof MediaStream !== 'undefined' && video?.srcObject instanceof MediaStream) {
         for (const track of video.srcObject.getTracks()) track.stop()
       }
@@ -122,7 +145,13 @@ export function CameraStreamCard({ streamUrl, onDeactivate }: CameraStreamCardPr
             {state === 'error' ? 'Kamera momentan nicht erreichbar' : 'Kamera wird verbunden'}
           </strong>
           {state === 'error' && (
-            <button type="button" onClick={() => setAttempt((current) => current + 1)}>
+            <button
+              type="button"
+              onClick={() => {
+                retryDelayRef.current = 1_000
+                setAttempt((current) => current + 1)
+              }}
+            >
               <RefreshCw aria-hidden="true" /> Erneut verbinden
             </button>
           )}

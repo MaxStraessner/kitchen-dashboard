@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 import { App } from '../app/App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { CameraStreamCard } from '../features/camera/CameraStreamCard'
 import { createFallbackDashboard } from '../services/fallback'
 import type { CameraModeEvent, CameraModeStatus } from '../types/api'
 
@@ -276,4 +277,29 @@ test('dashboard stop button closes camera mode and restores the normal region', 
   )
   await waitFor(() => expect(PeerConnectionMock.instances[1]?.closed).toBe(true))
   expect(screen.getByText('Küche putzen')).toBeVisible()
+})
+
+test('camera stream reconnects automatically after signaling fails', async () => {
+  vi.stubGlobal('RTCPeerConnection', PeerConnectionMock)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve('offline'),
+      }),
+    ),
+  )
+
+  render(
+    <CameraStreamCard
+      streamUrl="/camera-stream/api/webrtc?src=tapo"
+      onDeactivate={() => Promise.resolve()}
+    />,
+  )
+
+  expect(await screen.findByText('Kamera momentan nicht erreichbar')).toBeVisible()
+  await waitFor(() => expect(PeerConnectionMock.instances).toHaveLength(2), { timeout: 2_000 })
+  expect(PeerConnectionMock.instances[0]?.closed).toBe(true)
 })
