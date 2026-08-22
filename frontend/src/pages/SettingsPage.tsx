@@ -2,6 +2,7 @@ import { CheckSquare, Gauge, Images, LogOut, UserRound, UsersRound } from 'lucid
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthProvider'
+import { CameraControl } from '../features/camera/CameraControl'
 
 export function SettingsPage() {
   const auth = useAuth()
@@ -24,6 +25,7 @@ export function SettingsPage() {
         </Link>
       </header>
       <div className="settings-card-grid">
+        <CameraControl />
         <Link className="settings-card" to="/account">
           <UserRound />
           <div>

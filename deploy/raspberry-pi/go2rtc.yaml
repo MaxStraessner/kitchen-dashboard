@@ -1,0 +1,22 @@
+modules: [api, streams, rtsp, webrtc]
+
+streams:
+  tapo:
+    - "${TAPO_CAMERA_STREAM}"
+
+api:
+  listen: "127.0.0.1:1984"
+  allow_paths: [/api, /api/webrtc]
+
+rtsp:
+  listen: ""
+
+webrtc:
+  listen: "127.0.0.1:8555"
+  candidates: ["127.0.0.1:8555"]
+  ice_servers: []
+
+log:
+  # go2rtc 1.9.14 may include a failing source URL in producer errors. Keep logging disabled so
+  # camera credentials can never reach container logs.
+  level: disabled

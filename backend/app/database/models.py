@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -228,3 +229,17 @@ class BringClientPresence(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class CameraModeState(Base):
+    __tablename__ = "camera_mode_state"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_camera_mode_state_singleton"),
+        CheckConstraint("revision >= 0", name="ck_camera_mode_state_revision"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { createFallbackDashboard } from '../src/services/fallback'
 
-async function mockAuthentication(page: Page) {
+async function mockAuthentication(page: Page, cameraActive = false) {
   await page.addInitScript(() => {
     Object.defineProperty(window, 'EventSource', {
       configurable: true,
@@ -35,6 +35,18 @@ async function mockAuthentication(page: Page) {
       }),
     }),
   )
+  await page.route('**/api/v1/camera/status', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        active: cameraActive,
+        expiresAt: cameraActive ? '2026-08-22T12:15:00Z' : null,
+        streamUrl: '/camera-stream/api/webrtc?src=tapo',
+        revision: cameraActive ? 1 : 0,
+      }),
+    }),
+  )
   await page.route('**/api/v1/bring/items', (route) =>
     route.fulfill({
       status: 200,
@@ -58,6 +70,44 @@ async function mockAuthentication(page: Page) {
     }),
   )
 }
+
+test('camera mode keeps the calendar and replaces the complete lower region', async ({ page }) => {
+  await mockAuthentication(page, true)
+  await page.setViewportSize({ width: 1440, height: 2560 })
+  const dashboard = createFallbackDashboard(new Date('2026-08-22T12:00:00+02:00'))
+  await page.route('**/api/v1/dashboard', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboard),
+    }),
+  )
+  await page.route('**/camera-stream/**', (route) =>
+    route.fulfill({ status: 503, contentType: 'text/plain', body: 'offline' }),
+  )
+
+  await page.goto('/')
+  const calendar = page.locator('.calendar-card')
+  const camera = page.getByLabel('Tapo Live Stream')
+  await expect(calendar).toBeVisible()
+  await expect(camera).toBeVisible()
+  await expect(page.getByText('Kamera momentan nicht erreichbar')).toBeVisible()
+  await expect(page.getByText('Aufgaben')).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Einkaufsliste' })).toBeHidden()
+  await expect(page.getByText('Spruch des Tages')).toBeHidden()
+  await expect(camera.locator('video')).not.toHaveAttribute('controls', '')
+
+  const calendarBox = await calendar.boundingBox()
+  const cameraBox = await camera.boundingBox()
+  expect(calendarBox).not.toBeNull()
+  expect(cameraBox).not.toBeNull()
+  if (!calendarBox || !cameraBox) throw new Error('Camera layout regions are missing')
+  expect(cameraBox.y).toBeGreaterThanOrEqual(calendarBox.y + calendarBox.height)
+  expect(cameraBox.width).toBeGreaterThan(calendarBox.width * 0.95)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440)
+
+  await page.screenshot({ path: 'tests/artifacts/camera-mode-1440x2560.png', fullPage: true })
+})
 
 function expectNoOverlap(
   first: { x: number; y: number; width: number; height: number },

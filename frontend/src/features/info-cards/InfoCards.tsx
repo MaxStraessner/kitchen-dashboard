@@ -20,11 +20,15 @@ const birthdays = [
   },
 ]
 
-export function InfoCards() {
+interface InfoCardsProps {
+  hidden?: boolean
+}
+
+export function InfoCards({ hidden = false }: InfoCardsProps) {
   const currentDate = berlinCalendarDate(useMinuteClock())
 
   return (
-    <div className="info-grid">
+    <div className="info-grid" hidden={hidden}>
       {birthdays.map((birthday) => (
         <BirthdayCard currentDate={currentDate} key={birthday.name} {...birthday} />
       ))}

@@ -6,6 +6,7 @@ from app.api.v1.account import router as account_router
 from app.api.v1.admin_users import router as admin_users_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.bring import router as bring_router
+from app.api.v1.camera import router as camera_router
 from app.api.v1.photos import router as photos_router
 from app.api.v1.setup import router as setup_router
 from app.api.v1.tasks import router as tasks_router
@@ -28,6 +29,7 @@ router.include_router(account_router)
 router.include_router(admin_users_router)
 router.include_router(tasks_router)
 router.include_router(bring_router)
+router.include_router(camera_router)
 router.include_router(photos_router)
 
 

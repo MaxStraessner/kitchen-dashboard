@@ -132,3 +132,14 @@ export interface BringItemsResponse {
   last_successful_sync_at: string | null
   revision: number
 }
+
+export interface CameraModeStatus {
+  active: boolean
+  expiresAt: string | null
+  streamUrl: string
+  revision: number
+}
+
+export interface CameraModeEvent extends CameraModeStatus {
+  type: 'camera_mode_changed'
+}
