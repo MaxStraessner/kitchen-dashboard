@@ -37,7 +37,7 @@ async def test_camera_mode_defaults_to_inactive_and_can_be_toggled(
     service = CameraModeService(
         Settings(
             camera_mode_timeout_minutes=15,
-            camera_stream_url="/camera-stream/api/webrtc?src=tapo",
+            camera_stream_url="/camera-stream/api/stream.mp4?src=tapo",
         )
     )
     app.dependency_overrides[service_dependency] = lambda: service
@@ -46,7 +46,7 @@ async def test_camera_mode_defaults_to_inactive_and_can_be_toggled(
     assert (await client.get("/api/v1/camera/status")).json() == {
         "active": False,
         "expiresAt": None,
-        "streamUrl": "/camera-stream/api/webrtc?src=tapo",
+        "streamUrl": "/camera-stream/api/stream.mp4?src=tapo",
         "revision": 0,
     }
     assert (await client.post("/api/v1/camera/activate")).status_code == 403

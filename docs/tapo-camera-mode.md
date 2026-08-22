@@ -1,8 +1,8 @@
 # Tapo camera mode
 
-The existing camera tile uses a same-origin WHEP/WebRTC endpoint. Production runs one isolated
-go2rtc service in the Kitchen Dashboard Compose project; there is no second camera application on
-the Raspberry Pi.
+The camera tile uses an authenticated same-origin progressive MP4 stream. Production runs one
+isolated go2rtc service in the Kitchen Dashboard Compose project; there is no second camera
+application on the Raspberry Pi.
 
 ## Runtime architecture
 
@@ -13,23 +13,23 @@ Tapo C201 192.168.178.72:554
             v
 Kitchen Dashboard go2rtc on VPS (internal API only)
             |
-            | WHEP signaling through authenticated frontend proxy
-            | WebRTC media on VPS Tailscale-IP:18080/udp
+            | H.264 in progressive MP4 through the authenticated Nginx proxy
+            | existing Kitchen Dashboard 18080/tcp listener
             v
 Existing camera tile in the Raspberry Pi Chromium browser
 ```
 
 The Raspberry Pi remains the Tailscale subnet router for exactly `192.168.178.72/32` and the kiosk
 browser. go2rtc runs on the VPS because the VPS and its Kitchen Dashboard containers can reach the
-camera through that route. No router port forwarding and no public camera port are required.
+camera through that route. No router port forwarding and no camera port are required.
 
 ## Browser protocol decision
 
-WebRTC is used because the existing tile already implements WHEP and it provides low latency with a
-single H.264 video track. MSE and HLS would add latency and a second frontend player path without
-improving this fixed kiosk route. The client retries failed signaling after an exponential delay,
-handles a persistent disconnected state, and closes the old peer, tracks, listeners, and timers
-before every new attempt.
+Progressive MP4 is used because Chromium can decode the camera's H.264 track natively and receive it
+through the existing authenticated dashboard HTTP connection. This avoids a separate WebRTC media
+socket and a direct browser route to a private VPS candidate. The tile becomes live only after the
+video element actually starts playing. Initial playback failures and persistent stalls trigger an
+automatic reconnect with an exponential delay.
 
 ## Protected production configuration
 
@@ -37,19 +37,18 @@ The VPS file `/docker/kitchen-dashboard/.env` is root-owned with mode `0600`. It
 
 ```text
 CAMERA_MODE_TIMEOUT_MINUTES=15
-CAMERA_STREAM_URL=/camera-stream/api/webrtc?src=tapo
-CAMERA_WEBRTC_BIND_IP=100.81.227.118
-TAPO_CAMERA_STREAM=rtsp://URL_ENCODED_USERNAME:URL_ENCODED_NEW_PASSWORD@192.168.178.72:554/stream1
+CAMERA_STREAM_URL=/camera-stream/api/stream.mp4?src=tapo
+TAPO_CAMERA_STREAM=rtsp://URL_ENCODED_USERNAME:URL_ENCODED_PASSWORD@192.168.178.72:554/stream1
 ```
 
-Use a newly rotated dedicated Tapo camera password. URL-encode reserved characters in both account
-fields. Enter the value directly in the protected VPS environment; never paste it into chat, Git,
+URL-encode reserved characters in both camera-account fields. Enter the value directly in the
+protected VPS environment; never paste it into chat, Git,
 command arguments, Compose output, logs, screenshots, or issue/PR text. Do not run `docker compose
 config` without `--quiet`, because its normal output resolves environment values.
 
-After rotating the password in the Tapo app, enter both camera-account fields through the interactive
-helper from a local PowerShell terminal. The password input is hidden and is transported through the
-SSH terminal, never as a command argument:
+Enter both camera-account fields through the interactive helper from a local PowerShell terminal.
+The password input is hidden and is transported through the SSH terminal, never as a command
+argument:
 
 ```powershell
 .\scripts\configure-production-camera.ps1
@@ -63,20 +62,18 @@ credential-bearing URL.
 
 | Component | Binding or destination | Exposure |
 | --- | --- | --- |
-| Dashboard | existing `152.239.117.234:18080/tcp` | unchanged |
-| WHEP signaling | `/camera-stream/api/webrtc?src=tapo` | same-origin, valid dashboard session required |
-| go2rtc API | `kitchen-dashboard-camera:1984/tcp` | Docker project network only |
-| WebRTC media | `100.81.227.118:18080/udp` | VPS Tailscale interface only |
+| Dashboard and MP4 stream | existing `152.239.117.234:18080/tcp` | unchanged, valid dashboard session required |
+| MP4 upstream | `kitchen-dashboard-camera:1984/tcp` | Docker project network only |
 | go2rtc RTSP server | disabled | none |
 | Tapo RTSP | `192.168.178.72:554/tcp` | outbound through the exact Tailscale `/32` route |
 
-TCP `18080` already belongs to the Kitchen Dashboard web service. UDP `18080` is a different socket
-and is reused for camera media, so no additional port number or other project port is allocated.
-The go2rtc Web UI/admin surface and TCP ports `1984`, `554`, `8554`, and `8555` are not published.
+The camera container publishes no host port. The go2rtc Web UI/admin surface and TCP ports `1984`,
+`554`, `8554`, and `8555` are not published. The previous UDP media mapping is not needed.
 
-Nginx accepts only `POST /camera-stream/api/webrtc?src=tapo`. It rejects other paths, source names,
-and WHIP `dst` parameters, then validates the existing dashboard session through the camera status
-API before proxying the SDP body. Camera credentials never enter the browser response.
+Nginx accepts only `GET /camera-stream/api/stream.mp4?src=tapo`. It rejects other paths, source
+names, query parameters, and methods, then validates the existing dashboard session through the
+camera status API before proxying the stream. Proxy buffering and caching are disabled. Camera
+credentials never enter the browser response.
 
 ## Deployment and health
 
@@ -93,16 +90,17 @@ Dashboard unhealthy.
 
 1. Confirm the four Kitchen Dashboard services are healthy and the exact merged `main` commit is
    deployed.
-2. Confirm no public `1984`, `554`, `8554`, or `8555` listener exists and UDP `18080` is bound only to
-   `100.81.227.118`.
-3. Confirm an unauthenticated WHEP POST is rejected and a different `src` or `dst` query is rejected.
-4. Log in on the Raspberry Pi dashboard, activate **Kamera** from settings, and confirm one live video
-   tile appears while the calendar remains mounted.
+2. Confirm the camera container publishes no host port and no public `1984`, `554`, `8554`, or `8555`
+   listener exists.
+3. Confirm an unauthenticated MP4 request is rejected and a different source, query, or method is
+   rejected.
+4. Log in on the Raspberry Pi dashboard, activate **Kamera** from settings, and confirm one decoded
+   live video tile appears while the calendar remains mounted.
 5. Power off or disconnect the camera, verify the error state, then restore it and confirm the stream
    reconnects automatically without reloading the dashboard.
 6. Stop camera mode from the card and from settings; confirm the previous dashboard region returns.
-7. Repeat activation/deactivation several times and confirm only one WebRTC peer remains at a time.
-8. Reboot/restart the relevant Kitchen Dashboard service and verify the stream route persists without
+7. Repeat activation/deactivation and confirm only one MP4 stream request remains at a time.
+8. Restart the relevant Kitchen Dashboard service and verify the stream route persists without
    changing any other VPS project or Raspberry Pi route.
 
 Repository tests prove state, authorization wiring, UI switching, cleanup, and reconnect behavior.

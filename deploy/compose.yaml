@@ -22,17 +22,14 @@ services:
       timeout: 4s
       retries: 5
 
-  # The WHEP API remains internal. TCP for the dashboard and UDP for WebRTC share the
-  # existing localhost port number, so local camera testing exposes no additional port.
+  # The MP4 stream stays internal and is served through the existing dashboard proxy.
+  # The camera container does not publish a host port.
   kitchen-dashboard-camera:
     image: alexxit/go2rtc:1.9.14
     environment:
       TAPO_CAMERA_STREAM: ${TAPO_CAMERA_STREAM:-}
-      CAMERA_WEBRTC_HOST_PORT: ${CAMERA_WEBRTC_PORT:-8081}
     volumes:
       - ./go2rtc.local.yaml:/config/go2rtc.yaml:ro
-    ports:
-      - "127.0.0.1:${CAMERA_WEBRTC_PORT:-8081}:8080/udp"
     networks: [kitchen-dashboard-app]
     read_only: true
     tmpfs:
@@ -73,7 +70,7 @@ services:
       BRING_PASSWORD: ${BRING_PASSWORD:-}
       BRING_LIST_UUID: ${BRING_LIST_UUID:-}
       CAMERA_MODE_TIMEOUT_MINUTES: ${CAMERA_MODE_TIMEOUT_MINUTES:-15}
-      CAMERA_STREAM_URL: ${CAMERA_STREAM_URL:-/camera-stream/api/webrtc?src=tapo}
+      CAMERA_STREAM_URL: ${CAMERA_STREAM_URL:-/camera-stream/api/stream.mp4?src=tapo}
       MEDIA_ROOT: /data/media
       PHOTO_MAX_UPLOAD_BYTES: ${PHOTO_MAX_UPLOAD_BYTES:-20971520}
       PHOTO_MAX_DIMENSION: ${PHOTO_MAX_DIMENSION:-2560}

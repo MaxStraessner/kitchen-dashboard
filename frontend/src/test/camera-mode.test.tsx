@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -29,38 +29,6 @@ class EventSourceMock {
   }
 
   close() {}
-}
-
-class PeerConnectionMock {
-  static instances: PeerConnectionMock[] = []
-  iceGatheringState = 'complete'
-  connectionState = 'new'
-  localDescription: RTCSessionDescriptionInit | null = null
-  ontrack: ((event: RTCTrackEvent) => void) | null = null
-  onconnectionstatechange: (() => void) | null = null
-  closed = false
-
-  constructor() {
-    PeerConnectionMock.instances.push(this)
-  }
-
-  addTransceiver() {}
-  addEventListener() {}
-  removeEventListener() {}
-  createOffer() {
-    return Promise.resolve({ type: 'offer' as const, sdp: 'offer' })
-  }
-  setLocalDescription(description: RTCSessionDescriptionInit) {
-    this.localDescription = description
-    return Promise.resolve()
-  }
-  setRemoteDescription() {
-    return Promise.resolve()
-  }
-  close() {
-    this.closed = true
-    this.connectionState = 'closed'
-  }
 }
 
 function response(payload: unknown, status = 200) {
@@ -109,7 +77,7 @@ function mockApplication(initialCamera: CameraModeStatus) {
       camera = {
         active: true,
         expiresAt: '2026-08-22T12:15:00Z',
-        streamUrl: '/camera-stream/api/webrtc?src=tapo',
+        streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
         revision: camera.revision + 1,
       }
       return Promise.resolve(response(camera))
@@ -170,7 +138,6 @@ function cameraEventSource(): EventSourceMock {
 
 beforeEach(() => {
   EventSourceMock.instances = []
-  PeerConnectionMock.instances = []
   vi.stubGlobal('EventSource', EventSourceMock)
 })
 
@@ -180,7 +147,7 @@ test('SSE switches only the lower dashboard region and preserves its mounted dat
   const application = mockApplication({
     active: false,
     expiresAt: null,
-    streamUrl: '/camera-stream/api/webrtc?src=tapo',
+    streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
     revision: 0,
   })
   renderAt()
@@ -193,7 +160,7 @@ test('SSE switches only the lower dashboard region and preserves its mounted dat
     type: 'camera_mode_changed',
     active: true,
     expiresAt: '2026-08-22T12:15:00Z',
-    streamUrl: '/camera-stream/api/webrtc?src=tapo',
+    streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
     revision: 1,
   }
   act(() => cameraEventSource().emit('camera_mode_changed', activeEvent))
@@ -204,6 +171,7 @@ test('SSE switches only the lower dashboard region and preserves its mounted dat
   expect(screen.getByText('Küche putzen')).not.toBeVisible()
   expect(screen.getByText('Spruch des Tages')).not.toBeVisible()
   expect(camera.querySelector('video')).not.toHaveAttribute('controls')
+  fireEvent.error(camera.querySelector('video') as HTMLVideoElement)
   expect(await screen.findByText('Kamera momentan nicht erreichbar')).toBeVisible()
 
   act(() =>
@@ -224,7 +192,7 @@ test('mobile settings camera control activates with one button press', async () 
   const application = mockApplication({
     active: false,
     expiresAt: null,
-    streamUrl: '/camera-stream/api/webrtc?src=tapo',
+    streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
     revision: 0,
   })
   const interaction = userEvent.setup()
@@ -241,20 +209,20 @@ test('mobile settings camera control activates with one button press', async () 
 })
 
 test('dashboard stop button closes camera mode and restores the normal region', async () => {
-  vi.stubGlobal('RTCPeerConnection', PeerConnectionMock)
   mockApplication({
     active: true,
     expiresAt: '2026-08-22T12:15:00Z',
-    streamUrl: '/camera-stream/api/webrtc?src=tapo',
+    streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
     revision: 1,
   })
   const interaction = userEvent.setup()
   renderAt()
 
-  await waitFor(() => expect(PeerConnectionMock.instances).toHaveLength(1))
+  const firstVideo = (await screen.findByLabelText('Tapo Live Stream')).querySelector('video')
+  expect(firstVideo).not.toBeNull()
   await interaction.click(await screen.findByRole('button', { name: 'Kamera beenden' }))
   await waitFor(() => expect(screen.queryByLabelText('Tapo Live Stream')).not.toBeInTheDocument())
-  expect(PeerConnectionMock.instances[0]?.closed).toBe(true)
+  expect(firstVideo?.isConnected).toBe(false)
   expect(await screen.findByText('Küche putzen')).toBeVisible()
   expect(screen.getByText('Familienkalender')).toBeVisible()
 
@@ -262,11 +230,13 @@ test('dashboard stop button closes camera mode and restores the normal region', 
     type: 'camera_mode_changed',
     active: true,
     expiresAt: '2026-08-22T12:30:00Z',
-    streamUrl: '/camera-stream/api/webrtc?src=tapo',
+    streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
     revision: 3,
   }
   act(() => cameraEventSource().emit('camera_mode_changed', activeEvent))
-  await waitFor(() => expect(PeerConnectionMock.instances).toHaveLength(2))
+  const secondVideo = (await screen.findByLabelText('Tapo Live Stream')).querySelector('video')
+  expect(secondVideo).not.toBeNull()
+  expect(secondVideo).not.toBe(firstVideo)
   act(() =>
     cameraEventSource().emit('camera_mode_changed', {
       ...activeEvent,
@@ -275,31 +245,26 @@ test('dashboard stop button closes camera mode and restores the normal region', 
       revision: 4,
     }),
   )
-  await waitFor(() => expect(PeerConnectionMock.instances[1]?.closed).toBe(true))
+  await waitFor(() => expect(secondVideo?.isConnected).toBe(false))
   expect(screen.getByText('Küche putzen')).toBeVisible()
 })
 
-test('camera stream reconnects automatically after signaling fails', async () => {
-  vi.stubGlobal('RTCPeerConnection', PeerConnectionMock)
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 503,
-        text: () => Promise.resolve('offline'),
-      }),
-    ),
-  )
-
+test('camera stream reconnects automatically after playback fails', async () => {
   render(
     <CameraStreamCard
-      streamUrl="/camera-stream/api/webrtc?src=tapo"
+      streamUrl="/camera-stream/api/stream.mp4?src=tapo"
       onDeactivate={() => Promise.resolve()}
     />,
   )
 
+  const camera = screen.getByLabelText('Tapo Live Stream')
+  const firstVideo = camera.querySelector('video') as HTMLVideoElement
+  expect(firstVideo).toHaveAttribute('src', '/camera-stream/api/stream.mp4?src=tapo')
+  fireEvent.error(firstVideo)
   expect(await screen.findByText('Kamera momentan nicht erreichbar')).toBeVisible()
-  await waitFor(() => expect(PeerConnectionMock.instances).toHaveLength(2), { timeout: 2_000 })
-  expect(PeerConnectionMock.instances[0]?.closed).toBe(true)
+  await waitFor(() => expect(camera.querySelector('video')).not.toBe(firstVideo), { timeout: 2_000 })
+  const secondVideo = camera.querySelector('video') as HTMLVideoElement
+  expect(await screen.findByText('Kamera wird verbunden')).toBeVisible()
+  fireEvent.playing(secondVideo)
+  await waitFor(() => expect(screen.queryByText('Kamera wird verbunden')).not.toBeInTheDocument())
 })

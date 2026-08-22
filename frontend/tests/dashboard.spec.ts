@@ -42,7 +42,7 @@ async function mockAuthentication(page: Page, cameraActive = false) {
       body: JSON.stringify({
         active: cameraActive,
         expiresAt: cameraActive ? '2026-08-22T12:15:00Z' : null,
-        streamUrl: '/camera-stream/api/webrtc?src=tapo',
+        streamUrl: '/camera-stream/api/stream.mp4?src=tapo',
         revision: cameraActive ? 1 : 0,
       }),
     }),
