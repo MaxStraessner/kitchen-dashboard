@@ -119,7 +119,6 @@ export const bringApi = {
 export const cameraApi = {
   status: (signal?: AbortSignal) => request<CameraModeStatus>('/camera/status', { signal }),
   activate: () => request<CameraModeStatus>('/camera/activate', { method: 'POST', csrf: true }),
-  deactivate: () =>
-    request<CameraModeStatus>('/camera/deactivate', { method: 'POST', csrf: true }),
+  deactivate: () => request<CameraModeStatus>('/camera/deactivate', { method: 'POST', csrf: true }),
   eventsUrl: `${API_ROOT}/camera/events`,
 }

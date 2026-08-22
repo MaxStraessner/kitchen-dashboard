@@ -1282,8 +1282,7 @@ button:not(:disabled):active {
   grid-row: span 2;
   min-height: clamp(380px, 46vw, 900px);
   background:
-    radial-gradient(circle at 50% 45%, rgba(95, 168, 255, 0.09), transparent 58%),
-    #05080c;
+    radial-gradient(circle at 50% 45%, rgba(95, 168, 255, 0.09), transparent 58%), #05080c;
 }
 .camera-video {
   position: absolute;
