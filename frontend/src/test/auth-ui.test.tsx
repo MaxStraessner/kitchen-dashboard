@@ -150,6 +150,11 @@ test('dashboard settings menu opens and account route renders', async () => {
       'Benutzerverwaltung',
     ),
   ).toBeInTheDocument()
+  expect(
+    within(screen.getByRole('navigation', { name: 'Einstellungsnavigation' })).getByRole('link', {
+      name: 'Kamera',
+    }),
+  ).toHaveAttribute('href', '/settings#camera')
   dashboard.unmount()
 
   mockState(admin)

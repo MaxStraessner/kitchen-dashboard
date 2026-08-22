@@ -14,7 +14,11 @@ export function CameraControl() {
   const until = activeUntil(camera.expiresAt)
 
   return (
-    <section className="settings-card camera-settings-card" aria-label="Kamerasteuerung">
+    <section
+      id="camera"
+      className="settings-card camera-settings-card"
+      aria-label="Kamerasteuerung"
+    >
       <Camera aria-hidden="true" />
       <div className="camera-settings-content">
         <div>

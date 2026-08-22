@@ -1,5 +1,6 @@
 import {
   CheckSquare,
+  Camera,
   Gauge,
   Images,
   LogOut,
@@ -53,6 +54,10 @@ export function SettingsMenu() {
               <Link to="/" onClick={() => setOpen(false)}>
                 <Gauge />
                 Dashboard
+              </Link>
+              <Link to="/settings#camera" onClick={() => setOpen(false)}>
+                <Camera />
+                Kamera
               </Link>
               <Link to="/account" onClick={() => setOpen(false)}>
                 <UserRound />
