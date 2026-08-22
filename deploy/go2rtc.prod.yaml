@@ -1,0 +1,26 @@
+modules: [api, streams, rtsp, webrtc]
+
+streams:
+  tapo:
+    - "${TAPO_CAMERA_STREAM}"
+
+# Nginx is the only browser-facing caller and enforces the dashboard session.
+# The API/admin listener is not published on the VPS.
+api:
+  listen: ":1984"
+  allow_paths: [/api, /api/webrtc]
+
+# The RTSP module is needed as a client, but its restream server is disabled.
+rtsp:
+  listen: ""
+
+# Docker publishes only UDP on the already-used dashboard port number and only
+# on the VPS Tailscale address. No public WebRTC/TCP listener is created.
+webrtc:
+  listen: ":8080/udp"
+  candidates: ["${CAMERA_WEBRTC_HOST}:${CAMERA_WEBRTC_HOST_PORT}"]
+  ice_servers: []
+
+# RTSP failures can include the source URL, so credentials must never reach logs.
+log:
+  level: disabled
