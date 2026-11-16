@@ -243,3 +243,26 @@ class CameraModeState(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revision: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MealPlan(Base):
+    __tablename__ = "meal_plans"
+    __table_args__ = (
+        CheckConstraint("width > 0 AND height > 0", name="ck_meal_plans_dimensions"),
+        CheckConstraint("file_size > 0", name="ck_meal_plans_file_size"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    household_id: Mapped[str] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE"), unique=True
+    )
+    uploader_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    storage_name: Mapped[str] = mapped_column(String(80), unique=True)
+    thumbnail_storage_name: Mapped[str] = mapped_column(String(80), unique=True)
+    original_name: Mapped[str] = mapped_column(String(255))
+    original_mime_type: Mapped[str] = mapped_column(String(80))
+    original_file_size: Mapped[int] = mapped_column(Integer)
+    file_size: Mapped[int] = mapped_column(Integer)
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -8,19 +8,23 @@ Roles are `admin` (**Administrator**) and `member` (**Mitglied**). Every protect
 
 ## Permission matrix
 
-| Capability | Not signed in | Member | Administrator |
-| --- | ---: | ---: | ---: |
-| Public health and open setup status | Yes | Yes | Yes |
-| Dashboard, weather, calendar | No | Yes | Yes |
-| View/update own account | No | Yes | Yes |
-| Change own password / revoke own other sessions | No | Yes | Yes |
-| View user management | No | No | Yes |
-| Create/edit users and roles | No | No | Yes |
-| Activate/deactivate users | No | No | Yes |
-| Reset another password / revoke sessions | No | No | Yes |
+| Capability                                      | Not signed in | Member | Administrator |
+| ----------------------------------------------- | ------------: | -----: | ------------: |
+| Public health and open setup status             |           Yes |    Yes |           Yes |
+| Dashboard, weather, calendar                    |            No |    Yes |           Yes |
+| View/update own account                         |            No |    Yes |           Yes |
+| Change own password / revoke own other sessions |            No |    Yes |           Yes |
+| View user management                            |            No |     No |           Yes |
+| Create/edit users and roles                     |            No |     No |           Yes |
+| Activate/deactivate users                       |            No |     No |           Yes |
+| Reset another password / revoke sessions        |            No |     No |           Yes |
 
 An account with `must_change_password=true` may only view its account, change its password, fetch the session CSRF value, or log out. Dashboard and provider APIs return `403` until the change succeeds.
 
 ## Last administrator protection
 
 Before an active administrator is deactivated or changed to member, the backend counts active administrators in the household. If only one remains, it returns `409` with a domain-specific explanation. This also protects self-demotion and self-deactivation. No delete or membership-removal endpoint is exposed in this release.
+
+## Shared meal plan
+
+Active members and administrators may read, upload, replace or delete their household's shared meal plan, including an image uploaded by another member. Every metadata and image lookup is household-scoped. Accounts awaiting their mandatory password change cannot use these routes. PUT and DELETE require both active membership and existing CSRF/origin validation. No public media directory or new role is introduced.

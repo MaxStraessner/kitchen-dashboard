@@ -17,6 +17,8 @@ Implemented now:
 - Explicit, realistic demo calendar when no ICS sources exist
 - Shared household tasks and a private family photo slideshow
 - Mobile photo upload and management with optimized previews
+- Shared meal-plan image upload, replacement, deletion and zoom directly on the dashboard
+- Seven equal-height agenda days, paged weeks and complete day details without kiosk scrolling
 - Bidirectional shared Bring shopping list with safe server-side credentials
 - React component tests, FastAPI tests, and Playwright kiosk checks
 - Development and production-oriented Docker Compose definitions
@@ -78,7 +80,7 @@ Copy-Item .env.example .env
 docker compose -f deploy/compose.yaml up --build
 ```
 
-Open `http://localhost:8081`. PostgreSQL has no published host port. Stop with:
+Open `http://localhost:8081`. The API is reached through the frontend proxy; neither the backend nor PostgreSQL publishes a separate host port. Native development outside Docker still uses uvicorn on port 8000. Stop with:
 
 ```powershell
 docker compose -f deploy/compose.yaml down
@@ -112,37 +114,42 @@ PostgreSQL stores photo metadata and ownership only. Files live in the named Doc
 
 ## Environment variables
 
-| Variable | Default / purpose |
-| --- | --- |
-| `APP_TIMEZONE` | `Europe/Berlin` |
-| `APP_HTTP_PORT` | Public frontend port, default `8080` |
-| `BACKEND_PORT` | Local-only development API port, default `8000` |
-| `DATABASE_URL` | Async SQLAlchemy PostgreSQL connection |
-| `WEATHER_LOCATION_NAME` | `Unna` |
-| `WEATHER_LATITUDE` / `WEATHER_LONGITUDE` | `51.537` / `7.689` |
-| `WEATHER_CACHE_TTL_SECONDS` | `900` |
-| `CALENDAR_CACHE_TTL_SECONDS` | `900` |
-| `CALENDAR_SOURCES_JSON` | JSON array of private sources; `[]` enables demo mode |
-| `AUTH_COOKIE_SECURE` | Defaults to `false` in development and `true` in production Compose; set explicitly to `false` only for the approved direct-HTTP deployment |
-| `AUTH_SESSION_TTL_HOURS` | Normal session maximum, default `24` |
-| `AUTH_REMEMBER_TTL_DAYS` | Remembered session maximum, default `30` |
-| `AUTH_LOGIN_MAX_ATTEMPTS` | Failed attempts in the window, default `5` |
-| `AUTH_LOGIN_WINDOW_MINUTES` | Login limiting window, default `15` |
-| `AUTH_ALLOWED_ORIGINS` | Exact trusted browser origins for state-changing requests |
-| `BRING_ENABLED` | Enables the server-side Bring adapter; disabled by default |
-| `BRING_EMAIL` | Bring account email; protected host secret, never commit it |
-| `BRING_PASSWORD` | Bring account password; protected host secret, never commit it |
-| `BRING_LIST_UUID` | UUID of the shared list; keep it in host configuration |
-| `CAMERA_MODE_TIMEOUT_MINUTES` | Shared camera mode timeout, default `15` |
-| `CAMERA_STREAM_URL` | Credential-free same-origin WHEP path |
-| `TAPO_CAMERA_STREAM` | Protected RTSP source URL; never commit or print it |
-| `CAMERA_WEBRTC_BIND_IP` | Production-only VPS Tailscale IPv4 media binding |
-| `PHOTO_MAX_UPLOAD_BYTES` | Original upload limit, default `20971520` (20 MB) |
-| `PHOTO_MAX_DIMENSION` | Maximum long edge for dashboard images, default `2560` |
-| `PHOTO_THUMBNAIL_MAX_DIMENSION` | Maximum long edge for previews, default `480` |
-| `PHOTO_WEBP_QUALITY` | WebP quality, default `88` |
+| Variable                                 | Default / purpose                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_TIMEZONE`                           | `Europe/Berlin`                                                                                                                             |
+| `APP_HTTP_PORT`                          | Public frontend port, default `8080`                                                                                                        |
+| `DATABASE_URL`                           | Async SQLAlchemy PostgreSQL connection                                                                                                      |
+| `WEATHER_LOCATION_NAME`                  | `Unna`                                                                                                                                      |
+| `WEATHER_LATITUDE` / `WEATHER_LONGITUDE` | `51.537` / `7.689`                                                                                                                          |
+| `WEATHER_CACHE_TTL_SECONDS`              | `900`                                                                                                                                       |
+| `CALENDAR_CACHE_TTL_SECONDS`             | `900`                                                                                                                                       |
+| `CALENDAR_SOURCES_JSON`                  | JSON array of private sources; `[]` enables demo mode                                                                                       |
+| `AUTH_COOKIE_SECURE`                     | Defaults to `false` in development and `true` in production Compose; set explicitly to `false` only for the approved direct-HTTP deployment |
+| `AUTH_SESSION_TTL_HOURS`                 | Normal session maximum, default `24`                                                                                                        |
+| `AUTH_REMEMBER_TTL_DAYS`                 | Remembered session maximum, default `30`                                                                                                    |
+| `AUTH_LOGIN_MAX_ATTEMPTS`                | Failed attempts in the window, default `5`                                                                                                  |
+| `AUTH_LOGIN_WINDOW_MINUTES`              | Login limiting window, default `15`                                                                                                         |
+| `AUTH_ALLOWED_ORIGINS`                   | Exact trusted browser origins for state-changing requests                                                                                   |
+| `BRING_ENABLED`                          | Enables the server-side Bring adapter; disabled by default                                                                                  |
+| `BRING_EMAIL`                            | Bring account email; protected host secret, never commit it                                                                                 |
+| `BRING_PASSWORD`                         | Bring account password; protected host secret, never commit it                                                                              |
+| `BRING_LIST_UUID`                        | UUID of the shared list; keep it in host configuration                                                                                      |
+| `CAMERA_MODE_TIMEOUT_MINUTES`            | Shared camera mode timeout, default `15`                                                                                                    |
+| `CAMERA_STREAM_URL`                      | Credential-free same-origin WHEP path                                                                                                       |
+| `TAPO_CAMERA_STREAM`                     | Protected RTSP source URL; never commit or print it                                                                                         |
+| `CAMERA_WEBRTC_BIND_IP`                  | Production-only VPS Tailscale IPv4 media binding                                                                                            |
+| `PHOTO_MAX_UPLOAD_BYTES`                 | Original upload limit, default `20971520` (20 MB)                                                                                           |
+| `PHOTO_MAX_DIMENSION`                    | Maximum long edge for dashboard images, default `2560`                                                                                      |
+| `PHOTO_THUMBNAIL_MAX_DIMENSION`          | Maximum long edge for previews, default `480`                                                                                               |
+| `PHOTO_WEBP_QUALITY`                     | WebP quality, default `88`                                                                                                                  |
 
 The Unna coordinates identify the city center area and are configurable for a more precise household location.
+
+### Shared meal plan
+
+The **Essensplan** tile sits directly below the calendar. All active household members can select one JPEG/JPG, PNG or WebP image, replace it or confirm its deletion. Tap the proportional preview for the full image and zoom. Upload limits reuse the existing PHOTO settings (20 MiB, 50 megapixels, 2560-pixel long edge by default). The server checks decoded content, rotates EXIF images and stores lossless WebP plus a thumbnail. Files persist in the existing media volume under `/data/media/meal-plans`; PostgreSQL keeps the current household reference. Meal plans do not appear in the family slideshow. Visible connected devices update within the next eight-second metadata poll.
+
+At the 1440 × 2560 portrait kiosk, five grid bands share the viewport after spacing: top 16%, calendar 42%, meal plan 18%, lists 14%, information 10%. Long lists use bounded previews and full-list access. Seven agenda days have equal height; additional events open in a day dialog and further weeks are reached by navigation. Mobile and landscape layouts retain normal page scrolling. Camera mode temporarily replaces the three lower bands.
 
 ## Bring shopping list
 
@@ -214,6 +221,7 @@ Playwright writes the 1440 × 2560 screenshot to `frontend/tests/artifacts/dashb
 - `GET /api/v1/dashboard`
 - `GET/POST /api/v1/bring/items`, `POST /api/v1/bring/items/{id}/complete`
 - `GET /api/v1/bring/status`, `GET /api/v1/bring/events`
+- `GET/PUT/DELETE /api/v1/meal-plan`, authenticated `/{id}/image` and `/{id}/thumbnail`
 - `GET /api/v1/photos`, `POST /api/v1/photos`, `DELETE /api/v1/photos/{id}`
 - `GET /api/v1/photos/gallery`, authenticated image and thumbnail delivery
 - `GET /api/v1/setup/status`, `POST /api/v1/setup/initialize`
@@ -239,3 +247,11 @@ Responses expose update, stale, and demo metadata but never source URLs or raw i
 - Deployment remains a documented future operation only.
 
 The next module sequence is documented in [future modules](docs/future-modules.md).
+
+### Isolated feature validation
+
+`backend/tests/test_meal_plan_postgres.py` additionally exercises concurrent first uploads, replacements and deletion against real PostgreSQL. Set `KITCHEN_TEST_POSTGRES_URL` to an explicitly isolated test database; the test owns a UUID-named schema and removes only that schema. Normal pytest runs skip this optional integration test. The live browser authentication/upload test requires a fresh migrated backend database, `AUTH_ALLOWED_ORIGINS=http://127.0.0.1:4173` and `VITE_API_PROXY_TARGET` pointing to that isolated backend. It uses synthetic accounts and images and must never target production.
+
+The additive migration is `20261116_0007` (after `20260822_0006`). Deploy using the established backup/migration workflow only after separate deployment authorization. The physical Pi kiosk remains the final manual acceptance surface; local viewport tests do not establish its current rotation, operating-system scaling or display zoom.
+
+Calendar density at the target viewport: twelve appointments per day fit directly in a three-column/four-row grid, alongside the compact month overview. Additional appointments are indicated inside the clickable day heading without consuming an event slot. At smaller CSS viewports the preview capacity adapts to the actual space. Full titles, locations and source names remain accessible in day details.

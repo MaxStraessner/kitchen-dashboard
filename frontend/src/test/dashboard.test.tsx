@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -149,4 +150,17 @@ test('backend failure keeps the composed dashboard visible', async () => {
   expect(screen.getByText('Familienkalender')).toBeInTheDocument()
   expect(screen.getAllByText('Keine Termine')).toHaveLength(7)
   expect(screen.queryByText('Projektbesprechung')).not.toBeInTheDocument()
+})
+
+test('tasks load immediately under StrictMode even when the first request is aborted', async () => {
+  render(
+    <StrictMode>
+      <MemoryRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>
+    </StrictMode>,
+  )
+  expect(await screen.findByText('Küche putzen')).toBeInTheDocument()
 })

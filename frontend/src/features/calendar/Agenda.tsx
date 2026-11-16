@@ -1,24 +1,19 @@
-import { Droplets, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
 
+import { useMinuteClock } from '../../hooks/useMinuteClock'
+import { usePreviewCapacity } from '../../hooks/usePreviewCapacity'
 import type { CalendarEvent, WeatherForecastDay } from '../../types/api'
 import { WeatherIcon } from '../weather/WeatherIcon'
-import { dashboardTimeZone, dateKey, eventDateKeys, isSameDay } from './dateUtils'
+import { DayEventsDialog } from './DayEventsDialog'
+import { dashboardTimeZone, dateKey, eventDateKeys, addDateDays, eventTimeLabel } from './dateUtils'
 
-const weekday = new Intl.DateTimeFormat('de-DE', {
-  weekday: 'short',
-  timeZone: dashboardTimeZone,
-})
-const month = new Intl.DateTimeFormat('de-DE', {
+const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'short', timeZone: dashboardTimeZone })
+const shortDate = new Intl.DateTimeFormat('de-DE', {
+  day: 'numeric',
   month: 'short',
   timeZone: dashboardTimeZone,
 })
-const day = new Intl.DateTimeFormat('de-DE', { day: 'numeric', timeZone: dashboardTimeZone })
-const time = new Intl.DateTimeFormat('de-DE', {
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: dashboardTimeZone,
-})
-
 const sourcePriority: Record<string, number> = {
   family: 10,
   hannah: 20,
@@ -34,117 +29,162 @@ function compareEvents(left: CalendarEvent, right: CalendarEvent): number {
   }
   const priority =
     (sourcePriority[left.calendarId] ?? 100) - (sourcePriority[right.calendarId] ?? 100)
-  return priority !== 0 ? priority : left.title.localeCompare(right.title, 'de')
+  return priority || left.title.localeCompare(right.title, 'de') || left.id.localeCompare(right.id)
 }
 
-function dateFromKey(key: string): Date {
-  return new Date(`${key}T12:00:00Z`)
-}
-
-function eventTimeLabel(event: CalendarEvent, occurrenceKey: string): string {
-  if (event.allDay) return 'Ganztägig'
-  const keys = eventDateKeys(event)
-  if (occurrenceKey === keys[0]) return time.format(new Date(event.start))
-  if (occurrenceKey === keys.at(-1)) return `Bis ${time.format(new Date(event.end))}`
-  return 'Fortlaufend'
-}
-
-interface Group {
-  key: string
-  date: Date
+function AgendaDay({
+  date,
+  today,
+  events,
+  forecast,
+  onOpen,
+}: {
+  date: string
+  today: string
   events: CalendarEvent[]
   forecast?: WeatherForecastDay
+  onOpen: () => void
+}) {
+  const { ref, capacity } = usePreviewCapacity(events.length, 26, 2, true)
+  const value = new Date(`${date}T12:00:00Z`)
+  return (
+    <section className="agenda-day" data-date={date}>
+      <div className="agenda-date">
+        <button
+          type="button"
+          className="agenda-date-button"
+          aria-current={date === today ? 'date' : undefined}
+          onClick={onOpen}
+          aria-label={`Termine für ${date} anzeigen`}
+          aria-describedby={events.length > capacity ? `agenda-overflow-${date}` : undefined}
+        >
+          <span>
+            {weekday.format(value)}
+            {events.length > capacity && (
+              <small className="agenda-overflow-label" id={`agenda-overflow-${date}`}>
+                + {events.length - capacity} weitere
+              </small>
+            )}
+          </span>
+          <strong>{shortDate.format(value)}</strong>
+          {date === today && <em>Heute</em>}
+        </button>
+        {forecast && (
+          <div
+            className="agenda-weather"
+            title={forecast.condition}
+            aria-label={`${forecast.condition}, ${String(Math.round(forecast.high))} bis ${String(Math.round(forecast.low))} Grad, ${String(forecast.precipitation_probability)} Prozent Regenwahrscheinlichkeit`}
+          >
+            <WeatherIcon name={forecast.icon} />
+            <span>
+              {Math.round(forecast.high)}° / {Math.round(forecast.low)}°
+            </span>
+            <small>{forecast.precipitation_probability}% Regen</small>
+          </div>
+        )}
+      </div>
+      <div className="agenda-events" ref={ref}>
+        {events.length === 0 && <p className="agenda-day-empty">Keine Termine</p>}
+        {events.slice(0, capacity).map((event) => (
+          <article
+            className="agenda-event"
+            key={event.id}
+            aria-label={`${eventTimeLabel(event, date)} · ${event.title} · ${event.calendarName}${event.location ? ` · ${event.location}` : ''}`}
+            title={`${event.title} · ${event.calendarName}${event.location ? ` · ${event.location}` : ''}`}
+          >
+            <time>{eventTimeLabel(event, date)}</time>
+            <span
+              className="calendar-dot"
+              style={{ backgroundColor: event.color, color: event.color }}
+            />
+            <div className="agenda-copy">
+              <h3>{event.title}</h3>
+              <p>
+                {event.calendarName}
+                {event.location ? ` · ${event.location}` : ''}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 export function Agenda({
   events,
   forecast,
-  now = new Date(),
+  now,
 }: {
   events: CalendarEvent[]
   forecast: WeatherForecastDay[]
   now?: Date
 }) {
-  const todayKey = dateKey(now)
-  const groups = new Map<string, Group>()
-
-  for (const weather of forecast.slice(0, 7)) {
-    groups.set(weather.date, {
-      key: weather.date,
-      date: dateFromKey(weather.date),
-      events: [],
-      forecast: weather,
-    })
-  }
-
-  for (const event of events.filter((item) => !item.cancelled)) {
+  const clock = useMinuteClock()
+  const today = dateKey(now ?? clock)
+  // null follows today; an explicitly selected week remains anchored across midnight.
+  const [anchor, setAnchor] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const start = anchor && anchor > today ? anchor : today
+  const groups = new Map<string, CalendarEvent[]>()
+  let lastDate = addDateDays(today, 34)
+  for (const event of events.filter((event) => !event.cancelled)) {
     for (const key of eventDateKeys(event)) {
-      if (key < todayKey) continue
-      const group = groups.get(key) ?? { key, date: dateFromKey(key), events: [] }
-      group.events.push(event)
+      if (key < today) continue
+      const group = groups.get(key) ?? []
+      group.push(event)
       groups.set(key, group)
+      if (key > lastDate) lastDate = key
     }
   }
-
-  const days = [...groups.values()]
-    .filter((group) => group.key >= todayKey)
-    .sort((left, right) => left.key.localeCompare(right.key))
-  for (const group of days) group.events.sort(compareEvents)
-
-  if (days.length === 0)
-    return <div className="agenda-empty">In den nächsten fünf Wochen stehen keine Termine an.</div>
-
+  for (const group of groups.values()) group.sort(compareEvents)
+  const days = Array.from({ length: 7 }, (_, index) => addDateDays(start, index))
   return (
-    <div className="agenda-list" data-testid="agenda">
-      {days.map((group) => (
-        <section className="agenda-day" key={group.key} data-date={group.key}>
-          <div className="agenda-date">
-            <span>{weekday.format(group.date).replace('.', '')}</span>
-            <strong>{day.format(group.date)}</strong>
-            <small>{month.format(group.date).replace('.', '')}</small>
-            {isSameDay(group.date, now) && <em>Heute</em>}
-            {group.forecast && (
-              <div
-                className="agenda-weather"
-                aria-label={`${group.forecast.condition}, ${String(Math.round(group.forecast.high))} bis ${String(Math.round(group.forecast.low))} Grad, ${String(group.forecast.precipitation_probability)} Prozent Regenwahrscheinlichkeit`}
-                title={group.forecast.condition}
-              >
-                <WeatherIcon name={group.forecast.icon} />
-                <span>
-                  {Math.round(group.forecast.high)}° <i>{Math.round(group.forecast.low)}°</i>
-                </span>
-                <small>
-                  <Droplets aria-hidden="true" /> {group.forecast.precipitation_probability}%
-                </small>
-              </div>
-            )}
-          </div>
-          <div className="agenda-events">
-            {group.events.length === 0 && <p className="agenda-day-empty">Keine Termine</p>}
-            {group.events.map((event, index) => (
-              <article className="agenda-event" key={`${group.key}-${event.id}-${String(index)}`}>
-                <time>{eventTimeLabel(event, group.key)}</time>
-                <span
-                  className="calendar-dot"
-                  style={{ backgroundColor: event.color, color: event.color }}
-                />
-                <div className="agenda-copy">
-                  <h3>{event.title}</h3>
-                  <p>
-                    {event.calendarName}
-                    {event.location && (
-                      <>
-                        <span> · </span>
-                        <MapPin aria-hidden="true" /> {event.location}
-                      </>
-                    )}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
+    <div className="agenda-shell">
+      <nav className="agenda-navigation" aria-label="Agenda-Zeitraum">
+        <button
+          type="button"
+          aria-label="Vorherige sieben Tage"
+          disabled={start === today}
+          onClick={() => setAnchor(addDateDays(start, -7))}
+        >
+          <ChevronLeft aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => setAnchor(null)}>
+          Heute
+        </button>
+        <span>
+          {shortDate.format(new Date(`${start}T12:00:00Z`))} –{' '}
+          {shortDate.format(new Date(`${days[6] ?? start}T12:00:00Z`))}
+        </span>
+        <button
+          type="button"
+          aria-label="Nächste sieben Tage"
+          disabled={addDateDays(start, 7) > lastDate}
+          onClick={() => setAnchor(addDateDays(start, 7))}
+        >
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </nav>
+      <div className="agenda-list" data-testid="agenda">
+        {days.map((date) => (
+          <AgendaDay
+            key={date}
+            date={date}
+            today={today}
+            events={groups.get(date) ?? []}
+            forecast={forecast.find((day) => day.date === date)}
+            onOpen={() => setSelected(date)}
+          />
+        ))}
+      </div>
+      {selected && (
+        <DayEventsDialog
+          date={selected}
+          events={groups.get(selected) ?? []}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

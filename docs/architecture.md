@@ -8,7 +8,9 @@ This foundation is a modular monorepo without premature service distribution. Re
 
 `src/app` configures routes, `auth` owns the single authentication provider, API client, and route guards, `pages` composes the kiosk and account screens, `features` owns domain UI, `services` is the network boundary, `hooks` manages clock and refresh lifecycles, `types` mirrors stable API contracts, and `styles` contains tokens plus layout rules.
 
-The dashboard has four grid rows. At 1440 × 2560, the document is viewport-bound and overflow is disabled; the calendar row is more than twice the top-row allocation. At smaller viewports, the photo and supporting cards reflow and document scrolling becomes available.
+The portrait kiosk (at least 900 CSS pixels wide and 1500 high) has five viewport-bound grid bands: top cards 16%, calendar 42%, meal plan 18%, tasks/shopping 14%, and information 10%, after padding and gaps. The primary target is 1440 × 2560 at 100% browser zoom. Content never increases a band's height, including long shopping lists. Smaller or landscape viewports use natural document scrolling. Dialogs are portalled outside the grid.
+
+The agenda shows seven consecutive, equal-height days with bounded previews, measured using ResizeObserver. All events remain available in day dialogs and subsequent seven-day pages. Navigation covers at least five weeks and any additional returned event dates. Existing Berlin-local dates, source colors, all-day sorting and recurrence normalization are retained. Task previews link to existing management; the full shopping dialog shares the original Bring hook and mutations. Camera mode replaces the three lower bands while keeping their state mounted.
 
 On initial load, local fallback content preserves the composition. A successful API request atomically replaces it. On failure, the UI retains the composed view and adds one quiet offline status.
 
@@ -76,3 +78,13 @@ Local and production Compose mount `kitchen-dashboard-media-data` at `/data/medi
 ## Extension path
 
 New domains should add a feature in React and schema/service/provider or repository modules in FastAPI. Authentication and household scoping can later wrap API dependencies without changing provider boundaries. A realtime transport can later publish normalized domain events without making WebSockets a cache dependency.
+
+## Current meal plan
+
+`meal_plans` contains at most one current image per household, enforced by a unique household key. Metadata is in PostgreSQL and optimized lossless WebP plus a thumbnail are in `/data/media/meal-plans` in the existing persistent media volume. Meal plans are excluded from the photo gallery. The shared image service preserves existing photo processing and separately allows only decoded JPEG, PNG and WebP for meal plans. Existing PHOTO settings govern the 20 MiB/50 megapixel/2560-pixel defaults; no original upload is retained.
+
+All routes require an active household member with a completed required password change. PUT/DELETE additionally require the existing CSRF and origin checks. Every active member may replace or delete the shared plan. Metadata uses no-store; image URLs contain a new UUID after each replacement and use private immutable caching.
+
+Uploads finish decoding and writing new unique files before taking a PostgreSQL row lock on the household. This also serializes first uploads and deletes across API workers. Only after a successful metadata commit are old files removed; a failed commit rolls back and removes new files. A crash between filesystem and database steps may leave unreachable orphan files. Cleanup failures are logged and do not invalidate the committed plan.
+
+Visible clients refresh metadata every eight seconds and on focus/visibility restoration, retaining the last successful image during outages. An in-flight older read cannot overwrite a completed local mutation. Database and media backups already cover the new feature without changing Compose or deployment infrastructure.

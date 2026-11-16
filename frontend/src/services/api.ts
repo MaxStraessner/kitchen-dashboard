@@ -1,4 +1,5 @@
 import type {
+  CurrentMealPlanResponse,
   BringItem,
   BringItemsResponse,
   CameraModeStatus,
@@ -121,4 +122,15 @@ export const cameraApi = {
   activate: () => request<CameraModeStatus>('/camera/activate', { method: 'POST', csrf: true }),
   deactivate: () => request<CameraModeStatus>('/camera/deactivate', { method: 'POST', csrf: true }),
   eventsUrl: `${API_ROOT}/camera/events`,
+}
+
+export const mealPlanApi = {
+  get: (signal?: AbortSignal) =>
+    request<CurrentMealPlanResponse>('/meal-plan', { signal, cache: 'no-store' }),
+  replace: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file, file.name)
+    return request<CurrentMealPlanResponse>('/meal-plan', { method: 'PUT', formData, csrf: true })
+  },
+  remove: () => request<undefined>('/meal-plan', { method: 'DELETE', csrf: true }),
 }
