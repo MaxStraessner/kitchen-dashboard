@@ -7,7 +7,10 @@ const maxPassword = 'Max sichere Familienpassphrase 2026'
 const temporaryPassword = 'Jessica vorläufig sicher 2026'
 const jessicaPassword = 'Jessica dauerhaft sicher 2026'
 
-test('fresh household setup and complete administrator/member lifecycle', async ({ page }) => {
+test('fresh household setup and complete administrator/member lifecycle', async ({
+  page,
+  browser,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(page).toHaveURL(/\/setup$/)
@@ -89,4 +92,73 @@ test('fresh household setup and complete administrator/member lifecycle', async 
     clientWidth: document.documentElement.clientWidth,
   }))
   expect(dimensions.scrollWidth).toBe(dimensions.clientWidth)
+
+  // Real multipart upload, household visibility and eight-second refresh on a second device.
+  await page.getByLabel('Benutzername').fill('Max')
+  await page.getByLabel('Passwort').fill(maxPassword)
+  await page.getByRole('button', { name: 'Anmelden' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1400
+    canvas.height = 700
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas unavailable')
+    context.fillStyle = '#f4eee4'
+    context.fillRect(0, 0, 1400, 700)
+    context.fillStyle = '#182b29'
+    context.font = '60px sans-serif'
+    context.fillText('Unser Essensplan', 60, 110)
+    context.font = '36px sans-serif'
+    context.fillText('Montag: Nudeln · Dienstag: Gemüse · Mittwoch: Suppe', 60, 220)
+    return canvas.toDataURL('image/png').split(',')[1] ?? ''
+  })
+  await page.getByLabel('Essensplan auswählen').setInputFiles({
+    name: 'Essensplan.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  })
+  const preview = page.getByAltText('Aktueller Essensplan')
+  await expect(preview).toBeVisible()
+  await expect
+    .poll(() => preview.evaluate((node) => (node as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0)
+  const originalSrc = await preview.getAttribute('src')
+  await page.reload()
+  await expect(preview).toHaveAttribute('src', originalSrc ?? '')
+
+  const secondContext = await browser.newContext({ viewport: { width: 1440, height: 2560 } })
+  try {
+    const second = await secondContext.newPage()
+    await second.goto('/')
+    await second.getByLabel('Benutzername').fill('Max')
+    await second.getByLabel('Passwort').fill(maxPassword)
+    await second.getByRole('button', { name: 'Anmelden' }).click()
+    const otherPreview = second.getByAltText('Aktueller Essensplan')
+    await expect(otherPreview).toHaveAttribute('src', originalSrc ?? '')
+    await page.getByLabel('Essensplan auswählen').setInputFiles({
+      name: 'Neuer Plan.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(png, 'base64'),
+    })
+    await expect(preview).not.toHaveAttribute('src', originalSrc ?? '')
+    const replacementSrc = await preview.getAttribute('src')
+    await expect(otherPreview).toHaveAttribute('src', replacementSrc ?? '', { timeout: 12000 })
+    await page.getByLabel('Essensplan auswählen').setInputFiles({
+      name: 'Defekt.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('not an image'),
+    })
+    await expect(page.getByRole('status').filter({ hasText: 'gültiges Bild' })).toBeVisible()
+    await expect(preview).toHaveAttribute('src', replacementSrc ?? '')
+    await page.getByRole('button', { name: 'Löschen', exact: true }).click()
+    await page.getByRole('button', { name: 'Löschen bestätigen' }).click()
+    await expect(page.getByText('Noch kein Essensplan hinterlegt')).toBeVisible()
+    await expect(second.getByText('Noch kein Essensplan hinterlegt')).toBeVisible({
+      timeout: 12000,
+    })
+  } finally {
+    await secondContext.close()
+  }
 })

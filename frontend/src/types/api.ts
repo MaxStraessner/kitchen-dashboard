@@ -143,3 +143,17 @@ export interface CameraModeStatus {
 export interface CameraModeEvent extends CameraModeStatus {
   type: 'camera_mode_changed'
 }
+
+export interface MealPlan {
+  id: string
+  originalName: string
+  width: number
+  height: number
+  uploadedAt: string
+  imageUrl: string
+  thumbnailUrl: string
+}
+
+export interface CurrentMealPlanResponse {
+  plan: MealPlan | null
+}

@@ -37,8 +37,10 @@ Only functional transitions and a subtle loading-border breath are used. `prefer
 
 ## Kiosk and responsive rules
 
-At viewports at least 900 px wide and 1800 px tall, the root is fixed to exactly one viewport and cannot scroll. The four dashboard bands are sized by a constrained grid, and card internals clip only controlled surplus such as far-future agenda events. Playwright checks document dimensions, visibility, band separation, and the calendar-to-header height ratio at exactly 1440 × 2560.
+At portrait viewports at least 900 px wide and 1500 px tall, only the dashboard route is fixed to one dynamic viewport. Five bounded grid bands allocate 16/42/18/14/10 percent of available space to top cards, calendar, meal plan, shared lists and information. There is no shopping-count exception. Agenda days have equal height; overflow is exposed through labelled day and full-list dialogs rather than clipped data. Playwright checks document dimensions, day equality, band separation and child containment at 1440 × 2560 and smaller/zoom-equivalent viewports.
 
 At shorter desktop/tablet sizes the dashboard uses natural height and scrolling; top/media and info cards reflow to two columns. At phone widths all main regions stack. The primary kiosk remains the optimization target.
 
 Agenda type, fixed date/time columns, and high-value titles are sized for reading from roughly two to four meters. Secondary metadata is visibly quieter but not essential to understanding the next event.
+
+The meal-plan preview uses contain sizing with no cropping. Its full-screen image dialog supports 100–300% zoom and internal panning. New day, shopping and meal-plan dialogs share keyboard Escape handling, focus trapping/restoration and body scroll locking. File selection and replacement are available directly on the existing dashboard, including smartphone layouts.

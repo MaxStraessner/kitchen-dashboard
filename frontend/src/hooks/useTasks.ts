@@ -15,13 +15,15 @@ export function useTasks(): TasksState & {
   remove(id: string): Promise<void>
 } {
   const [state, setState] = useState<TasksState>({ tasks: [], loading: true, error: null })
-  const loading = useRef(false)
+  const loading = useRef<{ signal?: AbortSignal } | null>(null)
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    if (loading.current) return
-    loading.current = true
+    if (loading.current && !loading.current.signal?.aborted) return
+    const attempt = { signal }
+    loading.current = attempt
     try {
       const response = await tasksApi.list(signal)
+      if (signal?.aborted) return
       setState({
         tasks: Array.isArray(response.tasks) ? response.tasks : [],
         loading: false,
@@ -35,7 +37,7 @@ export function useTasks(): TasksState & {
         error: error instanceof Error ? error.message : 'Aufgaben konnten nicht geladen werden.',
       }))
     } finally {
-      loading.current = false
+      if (loading.current === attempt) loading.current = null
     }
   }, [])
 

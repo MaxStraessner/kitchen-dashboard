@@ -1,5 +1,6 @@
 import { CloudOff } from 'lucide-react'
 
+import { MealPlanCard } from '../features/meal-plan/MealPlanCard'
 import { CalendarPanel } from '../features/calendar/CalendarPanel'
 import { CameraStreamCard } from '../features/camera/CameraStreamCard'
 import { ClockCard } from '../features/clock/ClockCard'
@@ -16,7 +17,9 @@ export function DashboardPage() {
   const { data, loading, offline } = useDashboard()
   const camera = useCameraMode()
   return (
-    <main className={`dashboard ${loading ? 'is-loading' : ''}`}>
+    <main
+      className={`dashboard ${loading ? 'is-loading' : ''} ${camera.active ? 'is-camera-mode' : ''}`}
+    >
       <div className="ambient ambient--one" />
       <div className="ambient ambient--two" />
       <SettingsMenu />
@@ -26,6 +29,7 @@ export function DashboardPage() {
         <PhotoGalleryCard />
       </div>
       <CalendarPanel calendar={data.calendar} weather={data.weather} />
+      <MealPlanCard hidden={camera.active} />
       <div className="lower-grid" data-testid="lower-grid" hidden={camera.active}>
         <TodoPreviewCard />
         <ShoppingPreviewCard />

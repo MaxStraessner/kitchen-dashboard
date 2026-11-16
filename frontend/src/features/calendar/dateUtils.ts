@@ -43,3 +43,23 @@ export function eventDateKeys(event: CalendarEvent): string[] {
   }
   return keys.length > 0 ? keys : [startKey]
 }
+
+// Calendar-day arithmetic at UTC noon avoids DST jumps in the display timezone.
+export function addDateDays(key: string, amount: number): string {
+  const value = new Date(`${key}T12:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + amount)
+  return value.toISOString().slice(0, 10)
+}
+
+const time = new Intl.DateTimeFormat('de-DE', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: dashboardTimeZone,
+})
+export function eventTimeLabel(event: CalendarEvent, occurrenceKey: string): string {
+  if (event.allDay) return 'Ganztägig'
+  const keys = eventDateKeys(event)
+  if (occurrenceKey === keys[0]) return time.format(new Date(event.start))
+  if (occurrenceKey === keys.at(-1)) return `Bis ${time.format(new Date(event.end))}`
+  return 'Fortlaufend'
+}

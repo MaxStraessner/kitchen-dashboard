@@ -1,6 +1,8 @@
-import { AlertCircle, Check, Circle, Plus, ShoppingBasket, X } from 'lucide-react'
+import { AlertCircle, Plus, ShoppingBasket, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { usePreviewCapacity } from '../../hooks/usePreviewCapacity'
+import { ShoppingItem, ShoppingListDialog } from './ShoppingListDialog'
 import { Card } from '../../components/Card'
 import { useShoppingList } from '../../hooks/useShoppingList'
 import type { BringState } from '../../types/api'
@@ -101,6 +103,8 @@ function AddItemDialog({
 export function ShoppingPreviewCard() {
   const shopping = useShoppingList()
   const [adding, setAdding] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const { ref, capacity } = usePreviewCapacity(shopping.items.length, 48, 6)
   const unavailableText = statusText[shopping.status]
 
   return (
@@ -115,7 +119,7 @@ export function ShoppingPreviewCard() {
           </div>
           <span className="count-badge">{shopping.items.length} offen</span>
         </header>
-        <div className="shopping-grid" aria-live="polite">
+        <div className="shopping-grid" ref={ref} aria-live="polite">
           {shopping.loading &&
             Array.from({ length: 6 }, (_, index) => (
               <div className="shopping-item shopping-skeleton" key={index} aria-hidden="true" />
@@ -126,25 +130,19 @@ export function ShoppingPreviewCard() {
               <span>Die Einkaufsliste ist leer.</span>
             </div>
           )}
-          {shopping.items.map((item) => {
-            const completing = shopping.completing.has(item.id)
-            return (
-              <button
-                className={`shopping-item ${completing ? 'is-done' : ''}`}
-                type="button"
-                disabled={completing || item.id.startsWith('pending-')}
-                aria-label={`${item.name} als gekauft markieren`}
-                key={item.id}
-                onClick={() => void shopping.completeItem(item.id)}
-              >
-                {completing ? <Check aria-hidden="true" /> : <Circle aria-hidden="true" />}
-                <span className="shopping-copy">
-                  <span>{item.name}</span>
-                  {item.specification && <small>{item.specification}</small>}
-                </span>
-              </button>
-            )
-          })}
+          {shopping.items.slice(0, capacity).map((item) => (
+            <ShoppingItem
+              key={item.id}
+              item={item}
+              completing={shopping.completing.has(item.id)}
+              onComplete={() => void shopping.completeItem(item.id)}
+            />
+          ))}
+          {shopping.items.length > capacity && (
+            <button type="button" className="preview-more" onClick={() => setShowAll(true)}>
+              + {shopping.items.length - capacity} weitere · Alle anzeigen
+            </button>
+          )}
           {!shopping.loading && unavailableText && shopping.items.length === 0 && (
             <div className="shopping-state">
               <AlertCircle aria-hidden="true" /> {unavailableText}
@@ -171,6 +169,19 @@ export function ShoppingPreviewCard() {
           <Plus aria-hidden="true" /> Artikel hinzufügen
         </button>
       </Card>
+      {showAll && (
+        <ShoppingListDialog
+          items={shopping.items}
+          completing={shopping.completing}
+          onComplete={(id) => void shopping.completeItem(id)}
+          onAdd={() => {
+            setShowAll(false)
+            setAdding(true)
+          }}
+          onClose={() => setShowAll(false)}
+          error={shopping.error}
+        />
+      )}
       {adding && <AddItemDialog onClose={() => setAdding(false)} onAdd={shopping.addItem} />}
     </>
   )
