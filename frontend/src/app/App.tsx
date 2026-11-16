@@ -4,6 +4,7 @@ import { DashboardPage } from '../pages/DashboardPage'
 import { AdminRoute, LoginRoute, ProtectedRoute, SetupRoute } from '../auth/RouteGuards'
 import { AccountPage } from '../pages/AccountPage'
 import { LoginPage } from '../pages/LoginPage'
+import { MealPlanPage } from '../pages/MealPlanPage'
 import { PhotosPage } from '../pages/PhotosPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { TasksPage } from '../pages/TasksPage'
@@ -66,6 +67,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <PhotosPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/meal-plan"
+        element={
+          <ProtectedRoute>
+            <MealPlanPage />
           </ProtectedRoute>
         }
       />

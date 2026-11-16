@@ -1,5 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { MealPlanPage } from '../pages/MealPlanPage'
 
 import { MealPlanCard } from '../features/meal-plan/MealPlanCard'
 import { clearCsrfToken } from '../services/api'
@@ -33,20 +35,24 @@ test('uploads, enlarges and deletes a shared plan through protected API calls', 
     return Promise.resolve(new Response(JSON.stringify({ plan: current })))
   })
   vi.stubGlobal('fetch', requests)
-  render(<MealPlanCard />)
+  render(
+    <MemoryRouter>
+      <MealPlanPage />
+    </MemoryRouter>,
+  )
   expect(await screen.findByText('Noch kein Essensplan hinterlegt')).toBeInTheDocument()
   const user = userEvent.setup()
   await user.upload(
     screen.getByLabelText('Essensplan auswählen'),
     new File(['image'], 'plan.png', { type: 'image/png' }),
   )
-  expect(await screen.findByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/thumb/p1')
+  expect(await screen.findByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/image/p1')
   const upload = requests.mock.calls.find(([, options]) => options?.method === 'PUT')
   expect(new Headers(upload?.[1]?.headers).get('X-CSRF-Token')).toBe('token')
   expect(upload?.[1]?.body).toBeInstanceOf(FormData)
   await user.click(screen.getByRole('button', { name: 'Essensplan vergrößern' }))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Vergrößern' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Vergrößern' }))
   expect(screen.getByText('150 %')).toBeInTheDocument()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -66,21 +72,29 @@ test('keeps current image on failed replacement and refreshes visible devices', 
     if (_url.endsWith('/auth/csrf'))
       return Promise.resolve(new Response(JSON.stringify({ csrfToken: 'token' })))
     return Promise.resolve(
-      new Response(JSON.stringify({ plan: { ...plan, id, thumbnailUrl: `/thumb/${id}` } })),
+      new Response(
+        JSON.stringify({
+          plan: { ...plan, id, imageUrl: `/image/${id}`, thumbnailUrl: `/thumb/${id}` },
+        }),
+      ),
     )
   })
   vi.stubGlobal('fetch', requests)
-  render(<MealPlanCard />)
+  render(
+    <MemoryRouter>
+      <MealPlanPage />
+    </MemoryRouter>,
+  )
   await screen.findByAltText('Aktueller Essensplan')
   fireEvent.change(screen.getByLabelText('Essensplan auswählen'), {
     target: { files: [new File(['x'], 'bad.png', { type: 'image/png' })] },
   })
   expect(await screen.findByText('Bild ist zu groß')).toBeInTheDocument()
-  expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/thumb/p1')
+  expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/image/p1')
   id = 'p2'
   fireEvent(window, new Event('focus'))
   await waitFor(() =>
-    expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/thumb/p2'),
+    expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/image/p2'),
   )
 })
 

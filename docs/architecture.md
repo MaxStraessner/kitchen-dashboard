@@ -88,3 +88,9 @@ All routes require an active household member with a completed required password
 Uploads finish decoding and writing new unique files before taking a PostgreSQL row lock on the household. This also serializes first uploads and deletes across API workers. Only after a successful metadata commit are old files removed; a failed commit rolls back and removes new files. A crash between filesystem and database steps may leave unreachable orphan files. Cleanup failures are logged and do not invalidate the committed plan.
 
 Visible clients refresh metadata every eight seconds and on focus/visibility restoration, retaining the last successful image during outages. An in-flight older read cannot overwrite a completed local mutation. Database and media backups already cover the new feature without changing Compose or deployment infrastructure.
+
+## Meal-plan settings and adaptive agenda follow-up
+
+The protected frontend route `/settings/meal-plan` reuses the existing `useMealPlan`, API and image dialog. Settings menu and overview contain its own entry next to photos. Only that page owns upload/replacement/deletion controls; the dashboard card is read-only. No API, persistence, permission or database migration changes are required.
+
+Calendar-specific `calculateAgendaLayout` and `useAgendaPreviewLayout` choose the largest fitting density from 17/16/14 px based on measured content size and event count. Returned CSS variables set the same row height and column count used by capacity calculation. The shared task/shopping preview hook is unchanged. Removing the fixed 700 px child height prevents clipping of late days inside shorter computer calendars. Docker-only polling keeps the existing Windows bind mount current.
