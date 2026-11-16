@@ -6,6 +6,7 @@ import {
   LogOut,
   Settings,
   UserRound,
+  Utensils,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -70,6 +71,10 @@ export function SettingsMenu() {
               <Link to="/settings/photos" onClick={() => setOpen(false)}>
                 <Images />
                 Fotos
+              </Link>
+              <Link to="/settings/meal-plan" onClick={() => setOpen(false)}>
+                <Utensils />
+                Essensplan
               </Link>
               {auth.user?.role === 'admin' && (
                 <Link to="/settings/users" onClick={() => setOpen(false)}>

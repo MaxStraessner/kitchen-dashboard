@@ -17,7 +17,7 @@ Implemented now:
 - Explicit, realistic demo calendar when no ICS sources exist
 - Shared household tasks and a private family photo slideshow
 - Mobile photo upload and management with optimized previews
-- Shared meal-plan image upload, replacement, deletion and zoom directly on the dashboard
+- Shared meal-plan image management under Settings and a display-only dashboard preview with zoom
 - Seven equal-height agenda days, paged weeks and complete day details without kiosk scrolling
 - Bidirectional shared Bring shopping list with safe server-side credentials
 - React component tests, FastAPI tests, and Playwright kiosk checks
@@ -147,7 +147,7 @@ The Unna coordinates identify the city center area and are configurable for a mo
 
 ### Shared meal plan
 
-The **Essensplan** tile sits directly below the calendar. All active household members can select one JPEG/JPG, PNG or WebP image, replace it or confirm its deletion. Tap the proportional preview for the full image and zoom. Upload limits reuse the existing PHOTO settings (20 MiB, 50 megapixels, 2560-pixel long edge by default). The server checks decoded content, rotates EXIF images and stores lossless WebP plus a thumbnail. Files persist in the existing media volume under `/data/media/meal-plans`; PostgreSQL keeps the current household reference. Meal plans do not appear in the family slideshow. Visible connected devices update within the next eight-second metadata poll.
+The **Essensplan** tile sits directly below the calendar. All active household members manage one current JPEG/JPG, PNG or WebP image under **Einstellungen → Essensplan** (`/settings/meal-plan`), alongside the separate family-photo settings. Upload, replacement and confirmed deletion are available there; the dashboard only displays the current plan and opens its enlarged view. Tap the proportional preview for the full image and zoom. Upload limits reuse the existing PHOTO settings (20 MiB, 50 megapixels, 2560-pixel long edge by default). The server checks decoded content, rotates EXIF images and stores lossless WebP plus a thumbnail. Files persist in the existing media volume under `/data/media/meal-plans`; PostgreSQL keeps the current household reference. Meal plans do not appear in the family slideshow. Visible connected devices update within the next eight-second metadata poll.
 
 At the 1440 × 2560 portrait kiosk, five grid bands share the viewport after spacing: top 16%, calendar 42%, meal plan 18%, lists 14%, information 10%. Long lists use bounded previews and full-list access. Seven agenda days have equal height; additional events open in a day dialog and further weeks are reached by navigation. Mobile and landscape layouts retain normal page scrolling. Camera mode temporarily replaces the three lower bands.
 
@@ -254,4 +254,6 @@ The next module sequence is documented in [future modules](docs/future-modules.m
 
 The additive migration is `20261116_0007` (after `20260822_0006`). Deploy using the established backup/migration workflow only after separate deployment authorization. The physical Pi kiosk remains the final manual acceptance surface; local viewport tests do not establish its current rotation, operating-system scaling or display zoom.
 
-Calendar density at the target viewport: twelve appointments per day fit directly in a three-column/four-row grid, alongside the compact month overview. Additional appointments are indicated inside the clickable day heading without consuming an event slot. At smaller CSS viewports the preview capacity adapts to the actual space. Full titles, locations and source names remain accessible in day details.
+Calendar density is chosen independently for each day: 17 px / 26 px rows / 250 px minimum columns, then 16 px / 24 px / 220 px, then 14 px / 20 px / 190 px. The largest tier that fits every event is used; if none fits, the dense tier shows the maximum number. Time labels remain at least 14 px. At the target viewport at least twelve appointments per day fit directly alongside the compact month overview. Additional appointments are indicated inside the clickable day heading without consuming an event slot. At smaller CSS viewports the preview capacity adapts to the actual space. Full titles, locations and source names remain accessible in day details.
+
+Local Docker file watching uses `VITE_USE_POLLING=true` with a 1000 ms interval. This avoids stale Vite transformations on Windows bind mounts. Native development keeps its normal watcher. After changing this environment setting, recreate only the frontend service with `docker compose -f deploy/compose.yaml up -d --no-deps --force-recreate kitchen-dashboard-web`. Verify the actual served source and browser behavior on port 8081, not merely the HTTP health response. See `docs/meal-plan-settings-and-adaptive-agenda.md` for validation.

@@ -114,6 +114,7 @@ test('fresh household setup and complete administrator/member lifecycle', async 
     context.fillText('Montag: Nudeln · Dienstag: Gemüse · Mittwoch: Suppe', 60, 220)
     return canvas.toDataURL('image/png').split(',')[1] ?? ''
   })
+  await page.goto('/settings/meal-plan')
   await page.getByLabel('Essensplan auswählen').setInputFiles({
     name: 'Essensplan.png',
     mimeType: 'image/png',
@@ -136,7 +137,10 @@ test('fresh household setup and complete administrator/member lifecycle', async 
     await second.getByLabel('Passwort').fill(maxPassword)
     await second.getByRole('button', { name: 'Anmelden' }).click()
     const otherPreview = second.getByAltText('Aktueller Essensplan')
-    await expect(otherPreview).toHaveAttribute('src', originalSrc ?? '')
+    await expect(otherPreview).toHaveAttribute(
+      'src',
+      originalSrc?.replace(/\/image$/, '/thumbnail') ?? '',
+    )
     await page.getByLabel('Essensplan auswählen').setInputFiles({
       name: 'Neuer Plan.png',
       mimeType: 'image/png',
@@ -144,13 +148,17 @@ test('fresh household setup and complete administrator/member lifecycle', async 
     })
     await expect(preview).not.toHaveAttribute('src', originalSrc ?? '')
     const replacementSrc = await preview.getAttribute('src')
-    await expect(otherPreview).toHaveAttribute('src', replacementSrc ?? '', { timeout: 12000 })
+    await expect(otherPreview).toHaveAttribute(
+      'src',
+      replacementSrc?.replace(/\/image$/, '/thumbnail') ?? '',
+      { timeout: 12000 },
+    )
     await page.getByLabel('Essensplan auswählen').setInputFiles({
       name: 'Defekt.png',
       mimeType: 'image/png',
       buffer: Buffer.from('not an image'),
     })
-    await expect(page.getByRole('status').filter({ hasText: 'gültiges Bild' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'gültiges Bild' })).toBeVisible()
     await expect(preview).toHaveAttribute('src', replacementSrc ?? '')
     await page.getByRole('button', { name: 'Löschen', exact: true }).click()
     await page.getByRole('button', { name: 'Löschen bestätigen' }).click()

@@ -1,8 +1,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 
 import { useMinuteClock } from '../../hooks/useMinuteClock'
-import { usePreviewCapacity } from '../../hooks/usePreviewCapacity'
+import { useAgendaPreviewLayout } from './useAgendaPreviewLayout'
 import type { CalendarEvent, WeatherForecastDay } from '../../types/api'
 import { WeatherIcon } from '../weather/WeatherIcon'
 import { DayEventsDialog } from './DayEventsDialog'
@@ -45,7 +45,13 @@ function AgendaDay({
   forecast?: WeatherForecastDay
   onOpen: () => void
 }) {
-  const { ref, capacity } = usePreviewCapacity(events.length, 26, 2, true)
+  const { ref, layout } = useAgendaPreviewLayout(events.length)
+  const { capacity } = layout
+  const gridStyle = {
+    '--agenda-columns': layout.columns,
+    '--agenda-row-height': `${String(layout.rowHeight)}px`,
+    '--agenda-font-size': `${String(layout.fontSize)}px`,
+  } as CSSProperties
   const value = new Date(`${date}T12:00:00Z`)
   return (
     <section className="agenda-day" data-date={date}>
@@ -83,7 +89,7 @@ function AgendaDay({
           </div>
         )}
       </div>
-      <div className="agenda-events" ref={ref}>
+      <div className="agenda-events" ref={ref} style={gridStyle} data-density={layout.density}>
         {events.length === 0 && <p className="agenda-day-empty">Keine Termine</p>}
         {events.slice(0, capacity).map((event) => (
           <article

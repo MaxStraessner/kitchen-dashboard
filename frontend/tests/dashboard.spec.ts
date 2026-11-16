@@ -590,10 +590,9 @@ test('dense calendars, long lists and meal images fit the kiosk including zoom-e
       await expect(page.locator('[data-date="2026-07-21"] .agenda-event')).toHaveCount(12)
       await expect(page.locator('[data-date="2026-07-21"] .agenda-overflow-label')).toHaveCount(0)
       await expect(page.locator('[data-date="2026-07-17"] .agenda-event')).toHaveCount(10)
-      await expect(page.locator('[data-date="2026-07-18"] .agenda-event')).toHaveCount(12)
-      await expect(page.locator('[data-date="2026-07-18"] .agenda-overflow-label')).toHaveText(
-        '+ 38 weitere',
-      )
+      expect(
+        await page.locator('[data-date="2026-07-18"] .agenda-event').count(),
+      ).toBeGreaterThanOrEqual(12)
     }
     const busyDay = page.locator('[data-date="2026-07-18"]')
     const visible = await busyDay.locator('.agenda-event').count()
@@ -659,4 +658,130 @@ test('all twelve daily events are visible across all seven equal-height days', a
     path: 'tests/artifacts/calendar-twelve-events-per-day.png',
     fullPage: true,
   })
+})
+
+test('adaptive agenda fits six events in the former four-slot 520 by 60 area', async ({ page }) => {
+  await mockAuthentication(page)
+  await page.setViewportSize({ width: 1440, height: 2560 })
+  const dashboard = createFallbackDashboard(new Date('2026-07-15T10:00:00+02:00'))
+  dashboard.calendar.events = Array.from({ length: 6 }, (_, i) => ({
+    id: `adaptive-${String(i)}`,
+    calendarId: 'family',
+    calendarName: 'Familie',
+    title: `Termin ${String(i + 1)}`,
+    start: '2026-07-15T10:00:00+02:00',
+    end: '2026-07-15T11:00:00+02:00',
+    allDay: false,
+    location: null,
+    description: null,
+    color: '#62d68b',
+    source: 'test',
+    lastModified: null,
+    cancelled: false,
+    stale: false,
+  }))
+  await page.route('**/api/v1/dashboard', (route) => route.fulfill({ json: dashboard }))
+  await page.goto('/')
+  const area = page.locator('[data-date="2026-07-15"] .agenda-events')
+  await area.evaluate((node) => {
+    const style = (node as HTMLElement).style
+    style.width = '520px'
+    style.height = '60px'
+    style.padding = '0'
+  })
+  await expect(area.locator('.agenda-event')).toHaveCount(6)
+  await expect(area).toHaveAttribute('data-density', 'dense')
+  const size = await area.evaluate((node) => ({
+    title: getComputedStyle(node.querySelector('h3') as Element).fontSize,
+    time: getComputedStyle(node.querySelector('time') as Element).fontSize,
+  }))
+  expect(size).toEqual({ title: '14px', time: '14px' })
+  await expect(page.locator('[data-date="2026-07-15"] .agenda-overflow-label')).toHaveCount(0)
+})
+
+test('computer windows keep all seven days bounded and adapt mixed event counts', async ({
+  page,
+}) => {
+  await mockAuthentication(page)
+  const dashboard = createFallbackDashboard(new Date('2026-07-15T10:00:00+02:00'))
+  const counts = [0, 4, 5, 8, 12, 50, 1]
+  dashboard.calendar.events = counts.flatMap((total, day) =>
+    Array.from({ length: total }, (_, i) => ({
+      id: `computer-${String(day)}-${String(i)}`,
+      calendarId: 'family',
+      calendarName: 'Familie',
+      title: `Termin ${String(i + 1)}`,
+      start: `2026-07-${String(15 + day)}T10:00:00+02:00`,
+      end: `2026-07-${String(15 + day)}T11:00:00+02:00`,
+      allDay: false,
+      location: null,
+      description: null,
+      color: '#62d68b',
+      source: 'test',
+      lastModified: null,
+      cancelled: false,
+      stale: false,
+    })),
+  )
+  await page.route('**/api/v1/dashboard', (route) => route.fulfill({ json: dashboard }))
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+    const metrics = await page
+      .locator('[data-date="2026-07-17"] .agenda-events')
+      .evaluate((node) => ({
+        width: node.clientWidth,
+        height: node.clientHeight,
+        density: node.getAttribute('data-density'),
+      }))
+    await expect(
+      page.locator('[data-date="2026-07-17"] .agenda-event'),
+      JSON.stringify({ viewport, metrics }),
+    ).toHaveCount(5)
+    const measurements = await page.locator('.agenda-day').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const r = node.getBoundingClientRect()
+        const parent = node.closest('.calendar-agenda')?.getBoundingClientRect()
+        const area = node.querySelector('.agenda-events')?.getBoundingClientRect()
+        const events = [...node.querySelectorAll('.agenda-event')]
+        const clipped = events.some((event) => {
+          const box = event.getBoundingClientRect()
+          return (
+            !area ||
+            box.top < area.top - 1 ||
+            box.bottom > area.bottom + 1 ||
+            box.right > area.right + 1
+          )
+        })
+        return {
+          height: r.height,
+          contained: parent ? r.top >= parent.top - 1 && r.bottom <= parent.bottom + 1 : false,
+          clipped,
+          fonts: events.flatMap((event) =>
+            [...event.querySelectorAll('h3,time')].map((child) =>
+              Number.parseFloat(getComputedStyle(child).fontSize),
+            ),
+          ),
+        }
+      }),
+    )
+    expect(
+      measurements.every(
+        (day) => day.contained && !day.clipped && day.fonts.every((font) => font >= 14),
+      ),
+      JSON.stringify({ viewport, measurements }),
+    ).toBeTruthy()
+    expect(
+      Math.max(...measurements.map((day) => day.height)) -
+        Math.min(...measurements.map((day) => day.height)),
+    ).toBeLessThanOrEqual(1)
+    if (viewport.width === 1280)
+      await page
+        .locator('.calendar-card')
+        .screenshot({ path: 'tests/artifacts/calendar-adaptive-1280x800.png' })
+  }
 })
