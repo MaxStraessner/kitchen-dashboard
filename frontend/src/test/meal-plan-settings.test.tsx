@@ -101,7 +101,7 @@ test('unauthenticated direct access redirects to login', async () => {
 test('dashboard has only preview and enlargement, with no file picker or mutations', async () => {
   const fetchMock = mock('member', plan)
   const { container } = render(<MealPlanCard />)
-  await screen.findByAltText('Aktueller Essensplan')
+  expect(await screen.findByAltText('Aktueller Essensplan')).toHaveAttribute('src', plan.imageUrl)
   expect(container.querySelector('input[type="file"]')).toBeNull()
   expect(
     screen.queryByRole('button', { name: /hochladen|ersetzen|löschen/i }),

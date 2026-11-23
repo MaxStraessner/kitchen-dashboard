@@ -163,3 +163,77 @@ test('meal-plan settings require authentication', async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('button', { name: 'Anmelden' })).toBeVisible()
 })
+
+test('dashboard uses the full-resolution raster for wide meal plans and enlargement', async ({
+  page,
+}) => {
+  await mockHousehold(page)
+  const images = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2400
+    canvas.height = 440
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas unavailable')
+    context.fillStyle = '#f4eee4'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillStyle = '#182b29'
+    context.font = '48px sans-serif'
+    const meals = ['Montag: Nudeln', 'Dienstag: Reis', 'Mittwoch: Suppe']
+    meals.forEach((meal, index) => context.fillText(meal, 60 + index * 800, 220))
+    const image = canvas.toDataURL('image/png').split(',')[1] ?? ''
+    const thumbnail = document.createElement('canvas')
+    thumbnail.width = 480
+    thumbnail.height = 88
+    thumbnail.getContext('2d')?.drawImage(canvas, 0, 0, 480, 88)
+    return { image, thumbnail: thumbnail.toDataURL('image/png').split(',')[1] ?? '' }
+  })
+  await page.route('**/quality-meal-*.png', (route) =>
+    route.fulfill({
+      contentType: 'image/png',
+      body: Buffer.from(
+        route.request().url().endsWith('thumbnail.png') ? images.thumbnail : images.image,
+        'base64',
+      ),
+    }),
+  )
+  await page.route('**/api/v1/meal-plan', (route) =>
+    route.fulfill({
+      json: {
+        plan: {
+          id: 'quality',
+          originalName: 'Wochenplan.png',
+          width: 2400,
+          height: 440,
+          uploadedAt: '2026-11-23T12:00:00Z',
+          imageUrl: '/quality-meal-image.png',
+          thumbnailUrl: '/quality-meal-thumbnail.png',
+        },
+      },
+    }),
+  )
+  for (const viewport of [
+    { width: 1440, height: 2560 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+    const preview = page.getByAltText('Aktueller Essensplan')
+    await expect
+      .poll(() => preview.evaluate((node) => (node as HTMLImageElement).naturalWidth))
+      .toBe(2400)
+    await expect(preview).toHaveAttribute('src', '/quality-meal-image.png')
+    const dimensions = await preview.evaluate((node) => ({
+      naturalWidth: (node as HTMLImageElement).naturalWidth,
+      displayedWidth: node.getBoundingClientRect().width,
+      fit: getComputedStyle(node).objectFit,
+    }))
+    expect(dimensions.naturalWidth).toBeGreaterThanOrEqual(dimensions.displayedWidth)
+    expect(dimensions.fit).toBe('contain')
+    await page.getByRole('button', { name: 'Essensplan vergrößern' }).click()
+    await expect(page.getByAltText('Essensplan in Großansicht')).toHaveAttribute(
+      'src',
+      '/quality-meal-image.png',
+    )
+    await page.keyboard.press('Escape')
+  }
+})

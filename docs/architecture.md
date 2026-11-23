@@ -91,6 +91,6 @@ Visible clients refresh metadata every eight seconds and on focus/visibility res
 
 ## Meal-plan settings and adaptive agenda follow-up
 
-The protected frontend route `/settings/meal-plan` reuses the existing `useMealPlan`, API and image dialog. Settings menu and overview contain its own entry next to photos. Only that page owns upload/replacement/deletion controls; the dashboard card is read-only. No API, persistence, permission or database migration changes are required.
+The protected frontend route `/settings/meal-plan` reuses the existing `useMealPlan`, API and image dialog. Settings menu and overview contain its own entry next to photos. Only that page owns upload/replacement/deletion controls; the dashboard card is read-only. The wide dashboard card uses the full display image (`imageUrl`), as do settings and enlargement: upscaling the 480-pixel thumbnail would blur text. Existing stored plans benefit without re-uploading. No API, persistence, permission or database migration changes are required.
 
 Calendar-specific `calculateAgendaLayout` and `useAgendaPreviewLayout` choose the largest fitting density from 17/16/14 px based on measured content size and event count. Returned CSS variables set the same row height and column count used by capacity calculation. The shared task/shopping preview hook is unchanged. Removing the fixed 700 px child height prevents clipping of late days inside shorter computer calendars. Docker-only polling keeps the existing Windows bind mount current.
