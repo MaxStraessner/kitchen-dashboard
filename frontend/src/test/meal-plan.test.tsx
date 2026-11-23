@@ -115,7 +115,7 @@ test('polls every eight seconds, pauses when hidden and retains last-known image
     await vi.advanceTimersByTimeAsync(8000)
   })
   expect(screen.getByText(/Verbindung unterbrochen/)).toBeInTheDocument()
-  expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/thumb/p1')
+  expect(screen.getByAltText('Aktueller Essensplan')).toHaveAttribute('src', '/image/p1')
   const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
   await act(async () => {
     await vi.advanceTimersByTimeAsync(16000)

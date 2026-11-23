@@ -26,7 +26,7 @@ export function MealPlanCard({ hidden = false }: { hidden?: boolean }) {
           >
             <img
               key={plan.id}
-              src={plan.thumbnailUrl}
+              src={plan.imageUrl}
               alt="Aktueller Essensplan"
               onError={() => setImageError(plan.id)}
             />
